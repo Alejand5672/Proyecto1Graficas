@@ -1,4 +1,4 @@
-use crate::config::{FOV, NUM_RAYOS, PASO_RAYO};
+use crate::config::{FOV, NUM_RAYOS};
 use crate::map::Map;
 use raylib::prelude::*;
 
@@ -12,17 +12,45 @@ pub struct Impacto {
 
 pub fn lanzar_rayo(mapa: &Map, origen: Vector2, angulo: f32, distancia_maxima: f32) -> Impacto {
     let direccion = Vector2::new(angulo.cos(), angulo.sin());
-    let mut distancia = 0.0;
+    let mut columna = origen.x.floor() as i32;
+    let mut fila = origen.y.floor() as i32;
+    let paso_x = if direccion.x < 0.0 { -1 } else { 1 };
+    let paso_y = if direccion.y < 0.0 { -1 } else { 1 };
+    let delta_x = if direccion.x.abs() < f32::EPSILON {
+        f32::INFINITY
+    } else {
+        1.0 / direccion.x.abs()
+    };
+    let delta_y = if direccion.y.abs() < f32::EPSILON {
+        f32::INFINITY
+    } else {
+        1.0 / direccion.y.abs()
+    };
+    let mut lado_x = if direccion.x < 0.0 {
+        (origen.x - columna as f32) * delta_x
+    } else {
+        (columna as f32 + 1.0 - origen.x) * delta_x
+    };
+    let mut lado_y = if direccion.y < 0.0 {
+        (origen.y - fila as f32) * delta_y
+    } else {
+        (fila as f32 + 1.0 - origen.y) * delta_y
+    };
 
-    while distancia < distancia_maxima {
-        distancia += PASO_RAYO;
-        let posicion = origen + direccion * distancia;
-        let columna = posicion.x.floor() as i32;
-        let fila = posicion.y.floor() as i32;
+    while lado_x.min(lado_y) <= distancia_maxima {
+        let distancia = if lado_x < lado_y {
+            lado_x += delta_x;
+            columna += paso_x;
+            lado_x - delta_x
+        } else {
+            lado_y += delta_y;
+            fila += paso_y;
+            lado_y - delta_y
+        };
 
-        if Map::es_pared(mapa.celda_en(posicion.x, posicion.y)) {
+        if Map::es_pared(mapa.celda_en(columna as f32, fila as f32)) {
             return Impacto {
-                posicion,
+                posicion: origen + direccion * distancia,
                 distancia,
                 fila,
                 columna,

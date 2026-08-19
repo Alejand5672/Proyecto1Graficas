@@ -1,5 +1,5 @@
 use crate::config::{FOV, NUM_RAYOS, TAM_CELDA};
-use crate::entity::Entity;
+use crate::entity::{Entity, EntityType};
 use crate::map::Map;
 use crate::player::Player;
 use crate::raycasting::Impacto;
@@ -58,6 +58,74 @@ fn dibujar_pickup_arma(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32) {
     );
 }
 
+fn dibujar_municion(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32) {
+    let ancho = (tamano * 0.42).max(7.0);
+    let alto = (tamano * 0.26).max(5.0);
+    d.draw_rectangle(
+        (centro.x - ancho / 2.0) as i32,
+        (centro.y - alto / 2.0) as i32,
+        ancho as i32,
+        alto as i32,
+        Color::new(194, 139, 44, 255),
+    );
+    d.draw_rectangle_lines(
+        (centro.x - ancho / 2.0) as i32,
+        (centro.y - alto / 2.0) as i32,
+        ancho as i32,
+        alto as i32,
+        Color::new(255, 220, 107, 255),
+    );
+}
+
+fn dibujar_soldado(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32) {
+    let cuerpo = Color::new(116, 50, 46, 255);
+    let casco = Color::new(51, 66, 53, 255);
+    let piel = Color::new(214, 160, 117, 255);
+    d.draw_rectangle(
+        (centro.x - tamano * 0.23) as i32,
+        centro.y as i32,
+        (tamano * 0.46) as i32,
+        (tamano * 0.48) as i32,
+        cuerpo,
+    );
+    d.draw_circle_v(
+        Vector2::new(centro.x, centro.y - tamano * 0.18),
+        tamano * 0.20,
+        piel,
+    );
+    d.draw_rectangle(
+        (centro.x - tamano * 0.23) as i32,
+        (centro.y - tamano * 0.38) as i32,
+        (tamano * 0.46) as i32,
+        (tamano * 0.16) as i32,
+        casco,
+    );
+    d.draw_rectangle(
+        (centro.x + tamano * 0.14) as i32,
+        (centro.y + tamano * 0.11) as i32,
+        (tamano * 0.38) as i32,
+        (tamano * 0.07).max(2.0) as i32,
+        Color::new(35, 38, 42, 255),
+    );
+}
+
+fn dibujar_bala(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32) {
+    d.draw_circle_v(
+        centro,
+        (tamano * 0.09).clamp(2.0, 8.0),
+        Color::new(255, 226, 97, 255),
+    );
+}
+
+fn dibujar_entidad(d: &mut RaylibDrawHandle, entidad: &Entity, centro: Vector2, tamano: f32) {
+    match entidad.tipo {
+        EntityType::Weapon => dibujar_pickup_arma(d, centro, tamano),
+        EntityType::Ammo => dibujar_municion(d, centro, tamano),
+        EntityType::Enemy => dibujar_soldado(d, centro, tamano),
+        EntityType::Bullet => dibujar_bala(d, centro, tamano),
+    }
+}
+
 fn dibujar_arma_primera_persona(d: &mut RaylibDrawHandle, ancho: f32, alto: f32) {
     let escala = (ancho.min(alto) / 500.0).max(0.75);
     let centro_x = ancho * 0.5;
@@ -103,29 +171,102 @@ fn dibujar_jugador(d: &mut RaylibDrawHandle, jugador: &Player, textura_jugador: 
     );
 }
 
+fn dibujar_minimapa(d: &mut RaylibDrawHandle, mapa: &Map, jugador: &Player, entidades: &[Entity]) {
+    let escala = 4.0_f32;
+    let ancho = mapa.columnas as f32 * escala;
+    let alto = mapa.filas as f32 * escala;
+    let margen = 12.0;
+    let origen = Vector2::new(d.get_screen_width() as f32 - ancho - margen, margen);
+
+    d.draw_rectangle(
+        (origen.x - 3.0) as i32,
+        (origen.y - 3.0) as i32,
+        (ancho + 6.0) as i32,
+        (alto + 6.0) as i32,
+        Color::new(8, 12, 18, 210),
+    );
+
+    for fila in 0..mapa.filas {
+        for columna in 0..mapa.columnas {
+            let color = if Map::es_pared(mapa.celdas[fila][columna]) {
+                Color::new(91, 122, 153, 255)
+            } else {
+                Color::new(34, 43, 50, 255)
+            };
+            d.draw_rectangle(
+                (origen.x + columna as f32 * escala) as i32,
+                (origen.y + fila as f32 * escala) as i32,
+                escala.ceil() as i32,
+                escala.ceil() as i32,
+                color,
+            );
+        }
+    }
+
+    for entidad in entidades.iter().filter(|entidad| entidad.active) {
+        let color = match entidad.tipo {
+            EntityType::Enemy => Color::new(224, 82, 68, 255),
+            EntityType::Weapon => Color::new(246, 200, 58, 255),
+            EntityType::Ammo => Color::new(239, 171, 57, 255),
+            EntityType::Bullet => Color::new(255, 240, 180, 255),
+        };
+        d.draw_circle_v(origen + entidad.posicion * escala, 2.0, color);
+    }
+
+    let posicion = origen + jugador.posicion * escala;
+    let frente = Vector2::new(jugador.angulo.cos(), jugador.angulo.sin());
+    d.draw_line_ex(posicion, posicion + frente * 10.0, 2.0, Color::RAYWHITE);
+    d.draw_circle_v(posicion, 3.0, Color::new(80, 219, 255, 255));
+    d.draw_rectangle_lines(
+        (origen.x - 3.0) as i32,
+        (origen.y - 3.0) as i32,
+        (ancho + 6.0) as i32,
+        (alto + 6.0) as i32,
+        Color::RAYWHITE,
+    );
+}
+
 fn dibujar_vista_3d(
     d: &mut RaylibDrawHandle,
+    mapa: &Map,
     jugador: &Player,
     entidades: &[Entity],
     impactos: &[(f32, Impacto)],
+    textura_muro: &Texture2D,
 ) {
     let ancho = d.get_screen_width() as f32;
     let alto = d.get_screen_height() as f32;
     let mitad_alto = alto / 2.0;
-    d.draw_rectangle(
-        0,
-        0,
-        ancho as i32,
-        mitad_alto as i32,
-        Color::new(22, 31, 47, 255),
-    );
-    d.draw_rectangle(
-        0,
-        mitad_alto as i32,
-        ancho as i32,
-        mitad_alto as i32,
-        Color::new(27, 33, 30, 255),
-    );
+    let bandas = 18;
+    for banda in 0..bandas {
+        let t = banda as f32 / bandas as f32;
+        let y = (t * mitad_alto) as i32;
+        let h = (mitad_alto / bandas as f32).ceil() as i32 + 1;
+        d.draw_rectangle(
+            0,
+            y,
+            ancho as i32,
+            h,
+            Color::new(
+                (13.0 + 15.0 * t) as u8,
+                (21.0 + 20.0 * t) as u8,
+                (34.0 + 25.0 * t) as u8,
+                255,
+            ),
+        );
+        d.draw_rectangle(
+            0,
+            (mitad_alto + y as f32) as i32,
+            ancho as i32,
+            h,
+            Color::new(
+                (37.0 - 19.0 * t) as u8,
+                (42.0 - 20.0 * t) as u8,
+                (40.0 - 18.0 * t) as u8,
+                255,
+            ),
+        );
+    }
 
     let ancho_estaca = ancho / NUM_RAYOS as f32;
     let distancia_plano = (ancho / 2.0) / (FOV / 2.0).tan();
@@ -135,20 +276,39 @@ fn dibujar_vista_3d(
         let alto_estaca = (distancia_plano / distancia).min(alto * 1.5);
         let techo = mitad_alto - alto_estaca / 2.0;
         let sombra = (1.0 / (1.0 + distancia * 0.10)).clamp(0.35, 1.0);
-        let base = color_muro(impacto.fila, impacto.columna);
-        let color = Color::new(
-            (base.r as f32 * sombra) as u8,
-            (base.g as f32 * sombra) as u8,
-            (base.b as f32 * sombra) as u8,
-            255,
-        );
-
-        d.draw_rectangle(
-            (i as f32 * ancho_estaca) as i32,
-            techo as i32,
-            ancho_estaca.ceil() as i32 + 1,
-            alto_estaca as i32,
-            color,
+        let cerca_vertical = (impacto.posicion.x - impacto.posicion.x.round()).abs()
+            < (impacto.posicion.y - impacto.posicion.y.round()).abs();
+        let coordenada_textura = if cerca_vertical {
+            impacto.posicion.y.rem_euclid(1.0)
+        } else {
+            impacto.posicion.x.rem_euclid(1.0)
+        };
+        let textura_x = (coordenada_textura * textura_muro.width() as f32)
+            .floor()
+            .clamp(0.0, textura_muro.width() as f32 - 1.0);
+        let variacion = match (impacto.fila + impacto.columna).rem_euclid(3) {
+            0 => (0.92, 0.98, 1.0),
+            1 => (0.82, 0.94, 0.96),
+            _ => (0.96, 0.90, 0.82),
+        };
+        let brillo = 255.0 * sombra;
+        d.draw_texture_pro(
+            textura_muro,
+            Rectangle::new(textura_x, 0.0, 1.0, textura_muro.height() as f32),
+            Rectangle::new(
+                i as f32 * ancho_estaca,
+                techo,
+                ancho_estaca.ceil() + 1.0,
+                alto_estaca,
+            ),
+            Vector2::zero(),
+            0.0,
+            Color::new(
+                (brillo * variacion.0) as u8,
+                (brillo * variacion.1) as u8,
+                (brillo * variacion.2) as u8,
+                255,
+            ),
         );
     }
 
@@ -167,8 +327,9 @@ fn dibujar_vista_3d(
 
             if pantalla_x >= 0.0 && pantalla_x < ancho && profundidad < distancia_muro {
                 let tamano = (distancia_plano * 0.48 / profundidad).clamp(8.0, alto * 0.72);
-                dibujar_pickup_arma(
+                dibujar_entidad(
                     d,
+                    entidad,
                     Vector2::new(pantalla_x, mitad_alto + tamano * 0.18),
                     tamano,
                 );
@@ -180,7 +341,49 @@ fn dibujar_vista_3d(
         dibujar_arma_primera_persona(d, ancho, alto);
     }
 
-    d.draw_text("Z / TAB: vista 2D", 14, 14, 20, Color::RAYWHITE);
+    dibujar_minimapa(d, mapa, jugador, entidades);
+
+    let centro = Vector2::new(ancho * 0.5, mitad_alto);
+    let mira = Color::new(235, 244, 238, 210);
+    d.draw_line_ex(
+        centro - Vector2::new(11.0, 0.0),
+        centro - Vector2::new(3.0, 0.0),
+        2.0,
+        mira,
+    );
+    d.draw_line_ex(
+        centro + Vector2::new(3.0, 0.0),
+        centro + Vector2::new(11.0, 0.0),
+        2.0,
+        mira,
+    );
+    d.draw_line_ex(
+        centro - Vector2::new(0.0, 11.0),
+        centro - Vector2::new(0.0, 3.0),
+        2.0,
+        mira,
+    );
+    d.draw_line_ex(
+        centro + Vector2::new(0.0, 3.0),
+        centro + Vector2::new(0.0, 11.0),
+        2.0,
+        mira,
+    );
+
+    d.draw_text(
+        &format!("Municion: {}", jugador.municion),
+        14,
+        14,
+        20,
+        Color::RAYWHITE,
+    );
+    d.draw_text(
+        "Mouse/stick: mirar  ESPACIO/clic/RT: disparar  Z/TAB/Start: vista",
+        14,
+        40,
+        18,
+        Color::RAYWHITE,
+    );
 }
 
 fn dibujar_vista_2d(
@@ -207,8 +410,9 @@ fn dibujar_vista_2d(
     }
 
     for entidad in entidades.iter().filter(|entidad| entidad.active) {
-        dibujar_pickup_arma(
+        dibujar_entidad(
             d,
+            entidad,
             entidad.posicion * TAM_CELDA as f32,
             TAM_CELDA as f32 * 0.55,
         );
@@ -232,7 +436,10 @@ fn dibujar_vista_2d(
     }
 
     d.draw_text(
-        "WASD: mover  Flechas/QE: girar  Z/TAB: vista 3D",
+        &format!(
+            "WASD: mover  Flechas/QE: girar  ESPACIO: disparar  Municion: {}",
+            jugador.municion
+        ),
         12,
         10,
         18,
@@ -248,11 +455,15 @@ pub fn dibujar_frame(
     entidades: &[Entity],
     impactos: &[(f32, Impacto)],
     textura_jugador: &Texture2D,
+    textura_muro: &Texture2D,
 ) {
     d.clear_background(Color::new(16, 22, 32, 255));
     if vista_3d {
-        dibujar_vista_3d(d, jugador, entidades, impactos);
+        dibujar_vista_3d(d, mapa, jugador, entidades, impactos, textura_muro);
     } else {
         dibujar_vista_2d(d, mapa, jugador, entidades, impactos, textura_jugador);
     }
+    let alto_pantalla = d.get_screen_height();
+    d.draw_rectangle(8, alto_pantalla - 32, 90, 24, Color::new(7, 10, 15, 190));
+    d.draw_fps(15, alto_pantalla - 29);
 }
