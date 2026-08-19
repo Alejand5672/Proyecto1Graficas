@@ -6,6 +6,7 @@ pub enum EntityType {
     Ammo,
     Enemy,
     Bullet,
+    EnemyBullet,
 }
 
 pub struct Entity {
@@ -14,6 +15,7 @@ pub struct Entity {
     pub active: bool,
     pub direccion: Vector2,
     pub vida: f32,
+    pub cooldown: f32,
 }
 
 impl Entity {
@@ -24,6 +26,7 @@ impl Entity {
             active: true,
             direccion: Vector2::zero(),
             vida: 0.0,
+            cooldown: 0.0,
         }
     }
 
@@ -34,6 +37,7 @@ impl Entity {
             active: true,
             direccion: Vector2::zero(),
             vida: 0.0,
+            cooldown: 0.0,
         }
     }
 
@@ -44,6 +48,7 @@ impl Entity {
             active: true,
             direccion: Vector2::zero(),
             vida: 0.0,
+            cooldown: 0.65 + posicion.x.rem_euclid(1.3),
         }
     }
 
@@ -54,6 +59,18 @@ impl Entity {
             active: true,
             direccion,
             vida: 1.2,
+            cooldown: 0.0,
+        }
+    }
+
+    pub fn enemy_bullet(posicion: Vector2, direccion: Vector2) -> Self {
+        Self {
+            tipo: EntityType::EnemyBullet,
+            posicion,
+            active: true,
+            direccion,
+            vida: 2.2,
+            cooldown: 0.0,
         }
     }
 }

@@ -109,12 +109,13 @@ fn dibujar_soldado(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32) {
     );
 }
 
-fn dibujar_bala(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32) {
-    d.draw_circle_v(
-        centro,
-        (tamano * 0.09).clamp(2.0, 8.0),
-        Color::new(255, 226, 97, 255),
-    );
+fn dibujar_bala(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32, enemiga: bool) {
+    let color = if enemiga {
+        Color::new(255, 72, 48, 255)
+    } else {
+        Color::new(255, 226, 97, 255)
+    };
+    d.draw_circle_v(centro, (tamano * 0.09).clamp(2.0, 8.0), color);
 }
 
 fn dibujar_entidad(d: &mut RaylibDrawHandle, entidad: &Entity, centro: Vector2, tamano: f32) {
@@ -122,13 +123,33 @@ fn dibujar_entidad(d: &mut RaylibDrawHandle, entidad: &Entity, centro: Vector2, 
         EntityType::Weapon => dibujar_pickup_arma(d, centro, tamano),
         EntityType::Ammo => dibujar_municion(d, centro, tamano),
         EntityType::Enemy => dibujar_soldado(d, centro, tamano),
-        EntityType::Bullet => dibujar_bala(d, centro, tamano),
+        EntityType::Bullet => dibujar_bala(d, centro, tamano, false),
+        EntityType::EnemyBullet => dibujar_bala(d, centro, tamano, true),
     }
 }
 
 fn dibujar_arma_primera_persona(d: &mut RaylibDrawHandle, ancho: f32, alto: f32) {
     let escala = (ancho.min(alto) / 500.0).max(0.75);
     let centro_x = ancho * 0.5;
+    let piel = Color::new(211, 151, 105, 255);
+    let guante = Color::new(63, 73, 64, 255);
+
+    let mano_izquierda = Vector2::new(centro_x - 45.0 * escala, alto - 62.0 * escala);
+    let mano_derecha = Vector2::new(centro_x + 42.0 * escala, alto - 55.0 * escala);
+    d.draw_line_ex(
+        Vector2::new(centro_x - 130.0 * escala, alto + 8.0),
+        mano_izquierda,
+        34.0 * escala,
+        guante,
+    );
+    d.draw_line_ex(
+        Vector2::new(centro_x + 130.0 * escala, alto + 8.0),
+        mano_derecha,
+        34.0 * escala,
+        guante,
+    );
+    d.draw_circle_v(mano_izquierda, 18.0 * escala, piel);
+    d.draw_circle_v(mano_derecha, 18.0 * escala, piel);
     d.draw_rectangle(
         (centro_x - 72.0 * escala) as i32,
         (alto - 105.0 * escala) as i32,
@@ -209,6 +230,7 @@ fn dibujar_minimapa(d: &mut RaylibDrawHandle, mapa: &Map, jugador: &Player, enti
             EntityType::Weapon => Color::new(246, 200, 58, 255),
             EntityType::Ammo => Color::new(239, 171, 57, 255),
             EntityType::Bullet => Color::new(255, 240, 180, 255),
+            EntityType::EnemyBullet => Color::new(255, 64, 48, 255),
         };
         d.draw_circle_v(origen + entidad.posicion * escala, 2.0, color);
     }
@@ -273,19 +295,26 @@ fn dibujar_vista_3d(
 
     for (i, (angulo, impacto)) in impactos.iter().enumerate() {
         let distancia = (impacto.distancia * (*angulo - jugador.angulo).cos()).max(0.08);
-        let alto_estaca = (distancia_plano / distancia).min(alto * 1.5);
+        // Proyección perspectiva real. Cuando el muro supera la pantalla se recorta
+        // también la región de textura, en vez de limitar artificialmente su escala.
+        let alto_estaca = distancia_plano / distancia;
         let techo = mitad_alto - alto_estaca / 2.0;
+        let inicio_visible = techo.max(0.0);
+        let fin_visible = (techo + alto_estaca).min(alto);
+        let alto_visible = (fin_visible - inicio_visible).max(0.0);
+        if alto_visible <= 0.0 {
+            continue;
+        }
         let sombra = (1.0 / (1.0 + distancia * 0.10)).clamp(0.35, 1.0);
-        let cerca_vertical = (impacto.posicion.x - impacto.posicion.x.round()).abs()
-            < (impacto.posicion.y - impacto.posicion.y.round()).abs();
-        let coordenada_textura = if cerca_vertical {
+        let coordenada_textura = if impacto.lado_vertical {
             impacto.posicion.y.rem_euclid(1.0)
         } else {
             impacto.posicion.x.rem_euclid(1.0)
         };
         let textura_x = (coordenada_textura * textura_muro.width() as f32)
-            .floor()
             .clamp(0.0, textura_muro.width() as f32 - 1.0);
+        let textura_y = ((inicio_visible - techo) / alto_estaca) * textura_muro.height() as f32;
+        let alto_textura = (alto_visible / alto_estaca) * textura_muro.height() as f32;
         let variacion = match (impacto.fila + impacto.columna).rem_euclid(3) {
             0 => (0.92, 0.98, 1.0),
             1 => (0.82, 0.94, 0.96),
@@ -294,12 +323,12 @@ fn dibujar_vista_3d(
         let brillo = 255.0 * sombra;
         d.draw_texture_pro(
             textura_muro,
-            Rectangle::new(textura_x, 0.0, 1.0, textura_muro.height() as f32),
+            Rectangle::new(textura_x, textura_y, 1.0, alto_textura),
             Rectangle::new(
                 i as f32 * ancho_estaca,
-                techo,
+                inicio_visible,
                 ancho_estaca.ceil() + 1.0,
-                alto_estaca,
+                alto_visible,
             ),
             Vector2::zero(),
             0.0,
@@ -371,7 +400,7 @@ fn dibujar_vista_3d(
     );
 
     d.draw_text(
-        &format!("Municion: {}", jugador.municion),
+        &format!("VIDA: {}   MUNICION: {}", jugador.vida, jugador.municion),
         14,
         14,
         20,
@@ -384,6 +413,50 @@ fn dibujar_vista_3d(
         18,
         Color::RAYWHITE,
     );
+
+    let enemigos = entidades
+        .iter()
+        .filter(|e| e.active && e.tipo == EntityType::Enemy)
+        .count();
+    d.draw_text(
+        &format!("ENEMIGOS: {enemigos}"),
+        14,
+        66,
+        18,
+        Color::new(255, 195, 91, 255),
+    );
+
+    if jugador.vida <= 0 || enemigos == 0 {
+        d.draw_rectangle(0, 0, ancho as i32, alto as i32, Color::new(5, 7, 10, 185));
+        let mensaje = if jugador.vida <= 0 {
+            "MISION FALLIDA"
+        } else {
+            "ZONA LIBERADA"
+        };
+        let color = if jugador.vida <= 0 {
+            Color::new(245, 76, 62, 255)
+        } else {
+            Color::new(95, 235, 137, 255)
+        };
+        let tamano = 42;
+        let texto_ancho = d.measure_text(mensaje, tamano);
+        d.draw_text(
+            mensaje,
+            (ancho as i32 - texto_ancho) / 2,
+            alto as i32 / 2 - 35,
+            tamano,
+            color,
+        );
+        let ayuda = "Presiona R para reiniciar";
+        let ayuda_ancho = d.measure_text(ayuda, 22);
+        d.draw_text(
+            ayuda,
+            (ancho as i32 - ayuda_ancho) / 2,
+            alto as i32 / 2 + 20,
+            22,
+            Color::RAYWHITE,
+        );
+    }
 }
 
 fn dibujar_vista_2d(

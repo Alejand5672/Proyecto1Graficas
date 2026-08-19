@@ -8,6 +8,7 @@ pub struct Impacto {
     pub distancia: f32,
     pub fila: i32,
     pub columna: i32,
+    pub lado_vertical: bool,
 }
 
 pub fn lanzar_rayo(mapa: &Map, origen: Vector2, angulo: f32, distancia_maxima: f32) -> Impacto {
@@ -38,7 +39,8 @@ pub fn lanzar_rayo(mapa: &Map, origen: Vector2, angulo: f32, distancia_maxima: f
     };
 
     while lado_x.min(lado_y) <= distancia_maxima {
-        let distancia = if lado_x < lado_y {
+        let lado_vertical = lado_x < lado_y;
+        let distancia = if lado_vertical {
             lado_x += delta_x;
             columna += paso_x;
             lado_x - delta_x
@@ -54,6 +56,7 @@ pub fn lanzar_rayo(mapa: &Map, origen: Vector2, angulo: f32, distancia_maxima: f
                 distancia,
                 fila,
                 columna,
+                lado_vertical,
             };
         }
     }
@@ -63,6 +66,7 @@ pub fn lanzar_rayo(mapa: &Map, origen: Vector2, angulo: f32, distancia_maxima: f
         distancia: distancia_maxima,
         fila: -1,
         columna: -1,
+        lado_vertical: false,
     }
 }
 

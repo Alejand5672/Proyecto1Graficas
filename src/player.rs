@@ -7,6 +7,7 @@ pub struct Player {
     pub velocidad: f32,
     pub has_weapon: bool,
     pub municion: i32,
+    pub vida: i32,
 }
 
 impl Player {
@@ -17,6 +18,7 @@ impl Player {
             velocidad: 2.4,
             has_weapon: false,
             municion: 0,
+            vida: 100,
         }
     }
 
