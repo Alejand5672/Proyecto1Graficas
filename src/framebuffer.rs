@@ -115,7 +115,20 @@ fn dibujar_bala(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32, enemiga:
     } else {
         Color::new(255, 226, 97, 255)
     };
-    d.draw_circle_v(centro, (tamano * 0.09).clamp(2.0, 8.0), color);
+    let radio = (tamano * 0.11).clamp(3.0, 10.0);
+    d.draw_circle_v(
+        centro,
+        radio * 2.2,
+        Color::new(color.r, color.g, color.b, 45),
+    );
+    d.draw_circle_v(centro, radio, color);
+    d.draw_circle_v(centro, (radio * 0.38).max(1.5), Color::WHITE);
+    d.draw_line_ex(
+        centro + Vector2::new(0.0, radio * 0.6),
+        centro + Vector2::new(0.0, radio * 3.4),
+        (radio * 0.65).max(2.0),
+        Color::new(color.r, color.g, color.b, 150),
+    );
 }
 
 fn dibujar_entidad(d: &mut RaylibDrawHandle, entidad: &Entity, centro: Vector2, tamano: f32) {
@@ -128,49 +141,54 @@ fn dibujar_entidad(d: &mut RaylibDrawHandle, entidad: &Entity, centro: Vector2, 
     }
 }
 
-fn dibujar_arma_primera_persona(d: &mut RaylibDrawHandle, ancho: f32, alto: f32) {
-    let escala = (ancho.min(alto) / 500.0).max(0.75);
-    let centro_x = ancho * 0.5;
-    let piel = Color::new(211, 151, 105, 255);
-    let guante = Color::new(63, 73, 64, 255);
+fn dibujar_arma_primera_persona(
+    d: &mut RaylibDrawHandle,
+    ancho: f32,
+    alto: f32,
+    textura_arma: &Texture2D,
+    retroceso: f32,
+) {
+    let altura_destino = (alto * 0.58).clamp(280.0, 430.0);
+    let ancho_destino = altura_destino * textura_arma.width() as f32 / textura_arma.height() as f32;
+    let fase_retroceso = (retroceso / 0.13).clamp(0.0, 1.0);
+    let desplazamiento = (fase_retroceso * std::f32::consts::PI).sin() * 16.0;
+    d.draw_texture_pro(
+        textura_arma,
+        Rectangle::new(
+            0.0,
+            0.0,
+            textura_arma.width() as f32,
+            textura_arma.height() as f32,
+        ),
+        Rectangle::new(
+            ancho * 0.5,
+            alto + 8.0 + desplazamiento,
+            ancho_destino,
+            altura_destino,
+        ),
+        Vector2::new(ancho_destino * 0.5, altura_destino),
+        0.0,
+        Color::WHITE,
+    );
 
-    let mano_izquierda = Vector2::new(centro_x - 45.0 * escala, alto - 62.0 * escala);
-    let mano_derecha = Vector2::new(centro_x + 42.0 * escala, alto - 55.0 * escala);
-    d.draw_line_ex(
-        Vector2::new(centro_x - 130.0 * escala, alto + 8.0),
-        mano_izquierda,
-        34.0 * escala,
-        guante,
-    );
-    d.draw_line_ex(
-        Vector2::new(centro_x + 130.0 * escala, alto + 8.0),
-        mano_derecha,
-        34.0 * escala,
-        guante,
-    );
-    d.draw_circle_v(mano_izquierda, 18.0 * escala, piel);
-    d.draw_circle_v(mano_derecha, 18.0 * escala, piel);
-    d.draw_rectangle(
-        (centro_x - 72.0 * escala) as i32,
-        (alto - 105.0 * escala) as i32,
-        (144.0 * escala) as i32,
-        (48.0 * escala) as i32,
-        Color::new(45, 50, 60, 255),
-    );
-    d.draw_rectangle(
-        (centro_x - 23.0 * escala) as i32,
-        (alto - 63.0 * escala) as i32,
-        (46.0 * escala) as i32,
-        (63.0 * escala) as i32,
-        Color::new(28, 31, 38, 255),
-    );
-    d.draw_rectangle(
-        (centro_x - 56.0 * escala) as i32,
-        (alto - 98.0 * escala) as i32,
-        (112.0 * escala) as i32,
-        (8.0 * escala) as i32,
-        Color::new(102, 112, 126, 255),
-    );
+    if retroceso > 0.075 {
+        let boca = Vector2::new(
+            ancho * 0.5,
+            alto + 8.0 + desplazamiento - altura_destino * 0.88,
+        );
+        d.draw_circle_v(boca, 18.0, Color::new(255, 166, 38, 105));
+        d.draw_circle_v(boca, 8.0, Color::new(255, 241, 158, 245));
+        for i in 0..8 {
+            let angulo = i as f32 * std::f32::consts::PI / 4.0;
+            let direccion = Vector2::new(angulo.cos(), angulo.sin());
+            d.draw_line_ex(
+                boca + direccion * 7.0,
+                boca + direccion * 27.0,
+                3.0,
+                Color::new(255, 196, 61, 210),
+            );
+        }
+    }
 }
 
 fn dibujar_jugador(d: &mut RaylibDrawHandle, jugador: &Player, textura_jugador: &Texture2D) {
@@ -255,6 +273,7 @@ fn dibujar_vista_3d(
     entidades: &[Entity],
     impactos: &[(f32, Impacto)],
     textura_muro: &Texture2D,
+    textura_arma: &Texture2D,
 ) {
     let ancho = d.get_screen_width() as f32;
     let alto = d.get_screen_height() as f32;
@@ -367,7 +386,7 @@ fn dibujar_vista_3d(
     }
 
     if jugador.has_weapon {
-        dibujar_arma_primera_persona(d, ancho, alto);
+        dibujar_arma_primera_persona(d, ancho, alto, textura_arma, jugador.retroceso);
     }
 
     dibujar_minimapa(d, mapa, jugador, entidades);
@@ -399,33 +418,10 @@ fn dibujar_vista_3d(
         mira,
     );
 
-    d.draw_text(
-        &format!("VIDA: {}   MUNICION: {}", jugador.vida, jugador.municion),
-        14,
-        14,
-        20,
-        Color::RAYWHITE,
-    );
-    d.draw_text(
-        "Mouse/stick: mirar  ESPACIO/clic/RT: disparar  Z/TAB/Start: vista",
-        14,
-        40,
-        18,
-        Color::RAYWHITE,
-    );
-
     let enemigos = entidades
         .iter()
         .filter(|e| e.active && e.tipo == EntityType::Enemy)
         .count();
-    d.draw_text(
-        &format!("ENEMIGOS: {enemigos}"),
-        14,
-        66,
-        18,
-        Color::new(255, 195, 91, 255),
-    );
-
     if jugador.vida <= 0 || enemigos == 0 {
         d.draw_rectangle(0, 0, ancho as i32, alto as i32, Color::new(5, 7, 10, 185));
         let mensaje = if jugador.vida <= 0 {
@@ -529,13 +525,62 @@ pub fn dibujar_frame(
     impactos: &[(f32, Impacto)],
     textura_jugador: &Texture2D,
     textura_muro: &Texture2D,
+    textura_arma: &Texture2D,
 ) {
     d.clear_background(Color::new(16, 22, 32, 255));
     if vista_3d {
-        dibujar_vista_3d(d, mapa, jugador, entidades, impactos, textura_muro);
+        dibujar_vista_3d(
+            d,
+            mapa,
+            jugador,
+            entidades,
+            impactos,
+            textura_muro,
+            textura_arma,
+        );
     } else {
         dibujar_vista_2d(d, mapa, jugador, entidades, impactos, textura_jugador);
     }
+    let enemigos = entidades
+        .iter()
+        .filter(|e| e.active && e.tipo == EntityType::Enemy)
+        .count();
+    let vida = jugador.vida.clamp(0, 100);
+    let color_vida = if vida > 60 {
+        Color::new(61, 211, 109, 255)
+    } else if vida > 30 {
+        Color::new(244, 184, 65, 255)
+    } else {
+        Color::new(239, 70, 62, 255)
+    };
+    d.draw_rectangle(10, 10, 286, 88, Color::new(5, 9, 15, 220));
+    d.draw_rectangle_lines(10, 10, 286, 88, Color::new(128, 153, 165, 255));
+    d.draw_text("VIDA", 20, 18, 21, Color::RAYWHITE);
+    d.draw_rectangle(82, 20, 150, 18, Color::new(49, 28, 28, 255));
+    d.draw_rectangle(82, 20, (150.0 * vida as f32 / 100.0) as i32, 18, color_vida);
+    d.draw_rectangle_lines(82, 20, 150, 18, Color::RAYWHITE);
+    d.draw_text(&format!("{vida}/100"), 240, 18, 20, color_vida);
+    d.draw_text(
+        &format!("MUNICION  {}", jugador.municion),
+        20,
+        48,
+        19,
+        Color::new(255, 215, 91, 255),
+    );
+    d.draw_text(
+        &format!("ENEMIGOS  {enemigos}"),
+        155,
+        48,
+        19,
+        Color::new(255, 151, 91, 255),
+    );
+    d.draw_text(
+        "Mouse/stick: mirar   Clic/RT: disparar",
+        20,
+        73,
+        13,
+        Color::new(184, 203, 211, 255),
+    );
     let alto_pantalla = d.get_screen_height();
     d.draw_rectangle(8, alto_pantalla - 32, 90, 24, Color::new(7, 10, 15, 190));
     d.draw_fps(15, alto_pantalla - 29);

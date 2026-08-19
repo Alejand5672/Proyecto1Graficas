@@ -35,6 +35,10 @@ fn main() {
         .expect("No se pudo cargar assets/wall_bunker.png");
     textura_muro.gen_texture_mipmaps();
     textura_muro.set_texture_filter(&thread, TextureFilter::TEXTURE_FILTER_TRILINEAR);
+    let textura_arma = rl
+        .load_texture(&thread, "assets/first_person_hands.png")
+        .expect("No se pudo cargar assets/first_person_hands.png");
+    textura_arma.set_texture_filter(&thread, TextureFilter::TEXTURE_FILTER_BILINEAR);
     let mut jugador = Player::new(spawn);
     let mut vista_3d = true;
     let mut tiempo_disparo = 0.0_f32;
@@ -70,6 +74,7 @@ fn main() {
             jugador.actualizar(&rl, &mapa, dt, vista_3d);
         }
         tiempo_disparo = (tiempo_disparo - dt).max(0.0);
+        jugador.retroceso = (jugador.retroceso - dt).max(0.0);
         for entidad in &mut entidades {
             if entidad.active && jugador.posicion.distance_to(entidad.posicion) < RADIO_PICKUP {
                 match entidad.tipo {
@@ -106,6 +111,7 @@ fn main() {
             ));
             jugador.municion -= 1;
             tiempo_disparo = ENFRIAMIENTO_DISPARO;
+            jugador.retroceso = 0.13;
         }
 
         let mut disparos_enemigos = Vec::new();
@@ -192,6 +198,7 @@ fn main() {
             &impactos,
             &textura_jugador,
             &textura_muro,
+            &textura_arma,
         );
     }
 }

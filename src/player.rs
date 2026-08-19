@@ -8,6 +8,7 @@ pub struct Player {
     pub has_weapon: bool,
     pub municion: i32,
     pub vida: i32,
+    pub retroceso: f32,
 }
 
 impl Player {
@@ -19,6 +20,7 @@ impl Player {
             has_weapon: false,
             municion: 0,
             vida: 100,
+            retroceso: 0.0,
         }
     }
 
