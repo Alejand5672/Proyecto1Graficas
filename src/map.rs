@@ -65,6 +65,13 @@ impl Map {
                         )));
                         *celda = ' ';
                     }
+                    'B' => {
+                        entidades.push(Entity::boss(Vector2::new(
+                            columna as f32 + 0.5,
+                            fila as f32 + 0.5,
+                        )));
+                        *celda = ' ';
+                    }
                     'S' => salida = Some((columna as i32, fila as i32)),
                     _ => {}
                 }

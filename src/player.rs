@@ -37,9 +37,7 @@ impl Player {
         }
 
         if usar_mouse {
-            let delta_mouse = rl.get_mouse_delta();
-            self.angulo += delta_mouse.x * 0.0028;
-            self.inclinacion = (self.inclinacion + delta_mouse.y * 0.42).clamp(-150.0, 150.0);
+            self.angulo += rl.get_mouse_delta().x * 0.0028;
         }
 
         let control_activo = rl.is_gamepad_available(0);
@@ -51,11 +49,6 @@ impl Player {
             let giro_control = rl.get_gamepad_axis_movement(0, GamepadAxis::GAMEPAD_AXIS_RIGHT_X);
             if giro_control.abs() > 0.16 {
                 self.angulo += giro_control * 2.5 * dt;
-            }
-            let inclinacion_control = rl.get_gamepad_axis_movement(0, GamepadAxis::GAMEPAD_AXIS_RIGHT_Y);
-            if inclinacion_control.abs() > 0.16 {
-                self.inclinacion = (self.inclinacion + inclinacion_control * 155.0 * dt)
-                    .clamp(-150.0, 150.0);
             }
         }
 

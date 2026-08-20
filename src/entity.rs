@@ -6,6 +6,7 @@ pub enum EntityType {
     Ammo,
     Health,
     Enemy,
+    Boss,
     Bullet,
     EnemyBullet,
 }
@@ -62,6 +63,17 @@ impl Entity {
             vida: 0.0,
             // El desfase evita que todos los soldados abran fuego a la vez.
             cooldown: 1.2 + posicion.x.rem_euclid(1.5),
+        }
+    }
+
+    pub fn boss(posicion: Vector2) -> Self {
+        Self {
+            tipo: EntityType::Boss,
+            posicion,
+            active: true,
+            direccion: Vector2::zero(),
+            vida: 18.0,
+            cooldown: 1.8,
         }
     }
 

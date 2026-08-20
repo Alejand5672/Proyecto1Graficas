@@ -5,6 +5,9 @@ use crate::player::Player;
 use crate::raycasting::Impacto;
 use raylib::prelude::*;
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum EstadoPantalla { Bienvenida, Jugando, NivelCompletado, Derrota, Victoria }
+
 fn color_muro(fila: i32, columna: i32) -> Color {
     if (fila + columna) % 2 == 0 {
         Color::new(48, 125, 201, 255)
@@ -126,13 +129,13 @@ fn dibujar_entidad(d: &mut RaylibDrawHandle, entidad: &Entity, centro: Vector2, 
         EntityType::Weapon => dibujar_pickup_arma(d, centro, tamano),
         EntityType::Ammo => dibujar_municion(d, centro, tamano),
         EntityType::Health => dibujar_botiquin(d, centro, tamano),
-        EntityType::Enemy => d.draw_texture_pro(
+        EntityType::Enemy | EntityType::Boss => d.draw_texture_pro(
             textura_enemigo,
             Rectangle::new(0.0, 0.0, textura_enemigo.width() as f32, textura_enemigo.height() as f32),
-            Rectangle::new(centro.x, centro.y, tamano * 1.25, tamano * 1.25),
-            Vector2::new(tamano * 0.625, tamano * 0.86),
+            Rectangle::new(centro.x, centro.y, tamano * if entidad.tipo == EntityType::Boss { 1.85 } else { 1.25 }, tamano * if entidad.tipo == EntityType::Boss { 1.85 } else { 1.25 }),
+            Vector2::new(tamano * if entidad.tipo == EntityType::Boss { 0.925 } else { 0.625 }, tamano * if entidad.tipo == EntityType::Boss { 1.85 } else { 1.25 }),
             0.0,
-            Color::WHITE,
+            if entidad.tipo == EntityType::Boss { Color::new(255, 126, 112, 255) } else { Color::WHITE },
         ),
         EntityType::Bullet => dibujar_bala(d, centro, tamano, false),
         EntityType::EnemyBullet => dibujar_bala(d, centro, tamano, true),
@@ -245,6 +248,7 @@ fn dibujar_minimapa(d: &mut RaylibDrawHandle, mapa: &Map, jugador: &Player, enti
     for entidad in entidades.iter().filter(|entidad| entidad.active) {
         let color = match entidad.tipo {
             EntityType::Enemy => Color::new(224, 82, 68, 255),
+            EntityType::Boss => Color::new(255, 46, 38, 255),
             EntityType::Weapon => Color::new(246, 200, 58, 255),
             EntityType::Ammo => Color::new(239, 171, 57, 255),
             EntityType::Health => Color::new(240, 76, 67, 255),
@@ -433,41 +437,6 @@ fn dibujar_vista_3d(
         mira,
     );
 
-    let enemigos = entidades
-        .iter()
-        .filter(|e| e.active && e.tipo == EntityType::Enemy)
-        .count();
-    if jugador.vida <= 0 || enemigos == 0 {
-        d.draw_rectangle(0, 0, ancho as i32, alto as i32, Color::new(5, 7, 10, 185));
-        let mensaje = if jugador.vida <= 0 {
-            "MISION FALLIDA"
-        } else {
-            "ZONA LIBERADA"
-        };
-        let color = if jugador.vida <= 0 {
-            Color::new(245, 76, 62, 255)
-        } else {
-            Color::new(95, 235, 137, 255)
-        };
-        let tamano = 42;
-        let texto_ancho = d.measure_text(mensaje, tamano);
-        d.draw_text(
-            mensaje,
-            (ancho as i32 - texto_ancho) / 2,
-            alto as i32 / 2 - 35,
-            tamano,
-            color,
-        );
-        let ayuda = "Presiona R para reiniciar";
-        let ayuda_ancho = d.measure_text(ayuda, 22);
-        d.draw_text(
-            ayuda,
-            (ancho as i32 - ayuda_ancho) / 2,
-            alto as i32 / 2 + 20,
-            22,
-            Color::RAYWHITE,
-        );
-    }
 }
 
 fn dibujar_vista_2d(
@@ -544,6 +513,8 @@ pub fn dibujar_frame(
     textura_enemigo: &Texture2D,
     textura_muro: &Texture2D,
     textura_arma: &Texture2D,
+    estado: EstadoPantalla,
+    nivel: u8,
 ) {
     d.clear_background(Color::new(16, 22, 32, 255));
     if vista_3d {
@@ -562,7 +533,7 @@ pub fn dibujar_frame(
     }
     let enemigos = entidades
         .iter()
-        .filter(|e| e.active && e.tipo == EntityType::Enemy)
+        .filter(|e| e.active && matches!(e.tipo, EntityType::Enemy | EntityType::Boss))
         .count();
     let vida = jugador.vida.clamp(0, 100);
     let color_vida = if vida > 60 {
@@ -593,6 +564,13 @@ pub fn dibujar_frame(
         19,
         Color::new(255, 151, 91, 255),
     );
+    if let Some(jefe) = entidades.iter().find(|e| e.active && e.tipo == EntityType::Boss) {
+        let vida_jefe = jefe.vida.clamp(0.0, 18.0);
+        d.draw_text("JEFE", 310, 18, 20, Color::new(255, 126, 112, 255));
+        d.draw_rectangle(310, 42, 165, 15, Color::new(55, 25, 25, 255));
+        d.draw_rectangle(310, 42, (165.0 * vida_jefe / 18.0) as i32, 15, Color::new(222, 57, 49, 255));
+        d.draw_rectangle_lines(310, 42, 165, 15, Color::RAYWHITE);
+    }
     d.draw_text(
         "Mouse/stick: mirar   Clic/RT: disparar",
         20,
@@ -603,4 +581,17 @@ pub fn dibujar_frame(
     let alto_pantalla = d.get_screen_height();
     d.draw_rectangle(8, alto_pantalla - 32, 90, 24, Color::new(7, 10, 15, 190));
     d.draw_fps(15, alto_pantalla - 29);
+    if let Some((titulo, detalle, color)) = match estado {
+        EstadoPantalla::Bienvenida => Some(("WICHO SLUG", "1/2 o flechas: elegir nivel    ENTER: jugar", Color::new(255, 215, 91, 255))),
+        EstadoPantalla::NivelCompletado => Some(("NIVEL 1 SUPERADO", "ENTER: siguiente nivel    M: menu", Color::new(95, 235, 137, 255))),
+        EstadoPantalla::Derrota => Some(("MISION FALLIDA", "Presiona R para reintentar", Color::new(245, 76, 62, 255))),
+        EstadoPantalla::Victoria => Some(("JEFE DERROTADO", "VICTORIA - Presiona R para volver al menu", Color::new(95, 235, 137, 255))),
+        EstadoPantalla::Jugando => None,
+    } {
+        let ancho = d.get_screen_width(); let alto = d.get_screen_height();
+        d.draw_rectangle(0, 0, ancho, alto, Color::new(5, 7, 10, 195));
+        let t = d.measure_text(titulo, 42); d.draw_text(titulo, (ancho - t) / 2, alto / 2 - 50, 42, color);
+        let s = d.measure_text(detalle, 21); d.draw_text(detalle, (ancho - s) / 2, alto / 2 + 15, 21, Color::RAYWHITE);
+        if estado == EstadoPantalla::Bienvenida { let n = format!("NIVEL SELECCIONADO: {nivel}"); let w = d.measure_text(&n, 18); d.draw_text(&n, (ancho - w) / 2, alto / 2 + 55, 18, Color::new(184, 203, 211, 255)); }
+    }
 }
