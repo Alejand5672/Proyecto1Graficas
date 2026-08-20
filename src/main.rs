@@ -30,6 +30,9 @@ fn main() {
     let textura_jugador = rl
         .load_texture(&thread, "assets/player.png")
         .expect("No se pudo cargar assets/player.png");
+    let textura_enemigo = rl
+        .load_texture(&thread, "assets/enemy_soldier.png")
+        .expect("No se pudo cargar assets/enemy_soldier.png");
     let mut textura_muro = rl
         .load_texture(&thread, "assets/wall_bunker.png")
         .expect("No se pudo cargar assets/wall_bunker.png");
@@ -86,6 +89,10 @@ fn main() {
                     EntityType::Ammo => {
                         entidad.active = false;
                         jugador.municion += 15;
+                    }
+                    EntityType::Health => {
+                        entidad.active = false;
+                        jugador.vida = (jugador.vida + 35).min(100);
                     }
                     _ => {}
                 }
@@ -206,6 +213,7 @@ fn main() {
             &entidades,
             &impactos,
             &textura_jugador,
+            &textura_enemigo,
             &textura_muro,
             &textura_arma,
         );

@@ -77,62 +77,26 @@ fn dibujar_municion(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32) {
     );
 }
 
-fn dibujar_soldado(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32) {
-    // Soldado de silueta arcade: casco, chaleco, hombreras, botas y fusil.
-    // Se conserva un dibujo geométrico para que se lea con nitidez a distancia.
-    let sombra = Color::new(31, 37, 31, 255);
-    let uniforme = Color::new(83, 104, 55, 255);
-    let chaleco = Color::new(121, 78, 42, 255);
-    let casco = Color::new(55, 72, 43, 255);
-    let piel = Color::new(224, 169, 116, 255);
-    let metal = Color::new(49, 54, 51, 255);
-    let borde = Color::new(22, 27, 25, 255);
-
-    // Sombra bajo los pies y botas separadas: evita que parezca un bloque flotante.
-    d.draw_ellipse(centro.x as i32, (centro.y + tamano * 0.45) as i32, tamano * 0.28, tamano * 0.07, sombra);
-    d.draw_rectangle((centro.x - tamano * 0.22) as i32, (centro.y + tamano * 0.25) as i32, (tamano * 0.15) as i32, (tamano * 0.25) as i32, sombra);
-    d.draw_rectangle((centro.x + tamano * 0.07) as i32, (centro.y + tamano * 0.25) as i32, (tamano * 0.15) as i32, (tamano * 0.25) as i32, sombra);
-    d.draw_rectangle((centro.x - tamano * 0.27) as i32, (centro.y + tamano * 0.43) as i32, (tamano * 0.22) as i32, (tamano * 0.08) as i32, borde);
-    d.draw_rectangle((centro.x + tamano * 0.04) as i32, (centro.y + tamano * 0.43) as i32, (tamano * 0.22) as i32, (tamano * 0.08) as i32, borde);
-
-    // Torso, chaleco y correas.
+fn dibujar_botiquin(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32) {
+    let ancho = (tamano * 0.48).max(9.0);
+    let alto = (tamano * 0.34).max(7.0);
     d.draw_rectangle(
-        (centro.x - tamano * 0.27) as i32,
-        (centro.y - tamano * 0.03) as i32,
-        (tamano * 0.54) as i32,
-        (tamano * 0.34) as i32,
-        uniforme,
+        (centro.x - ancho / 2.0) as i32,
+        (centro.y - alto / 2.0) as i32,
+        ancho as i32,
+        alto as i32,
+        Color::new(224, 225, 212, 255),
     );
-    d.draw_rectangle((centro.x - tamano * 0.20) as i32, (centro.y + tamano * 0.01) as i32, (tamano * 0.40) as i32, (tamano * 0.27) as i32, chaleco);
-    d.draw_rectangle((centro.x - tamano * 0.04) as i32, (centro.y + tamano * 0.01) as i32, (tamano * 0.06) as i32, (tamano * 0.27) as i32, Color::new(211, 160, 65, 255));
-
-    // Cabeza, visera y casco con banda clara tipo sprite de recreativa.
-    d.draw_circle_v(
-        Vector2::new(centro.x - tamano * 0.04, centro.y - tamano * 0.22),
-        tamano * 0.18,
-        piel,
+    d.draw_rectangle_lines(
+        (centro.x - ancho / 2.0) as i32,
+        (centro.y - alto / 2.0) as i32,
+        ancho as i32,
+        alto as i32,
+        Color::new(121, 43, 39, 255),
     );
-    d.draw_rectangle(
-        (centro.x - tamano * 0.25) as i32,
-        (centro.y - tamano * 0.43) as i32,
-        (tamano * 0.48) as i32,
-        (tamano * 0.18) as i32,
-        casco,
-    );
-    d.draw_rectangle((centro.x - tamano * 0.30) as i32, (centro.y - tamano * 0.28) as i32, (tamano * 0.42) as i32, (tamano * 0.07) as i32, casco);
-    d.draw_rectangle((centro.x - tamano * 0.10) as i32, (centro.y - tamano * 0.31) as i32, (tamano * 0.16) as i32, (tamano * 0.04) as i32, Color::new(164, 186, 92, 255));
-
-    // Brazo adelantado y fusil: una lectura más clara de "soldado que dispara".
-    d.draw_rectangle((centro.x + tamano * 0.16) as i32, (centro.y + tamano * 0.04) as i32, (tamano * 0.17) as i32, (tamano * 0.12) as i32, uniforme);
-    d.draw_rectangle(
-        (centro.x + tamano * 0.20) as i32,
-        (centro.y + tamano * 0.10) as i32,
-        (tamano * 0.46) as i32,
-        (tamano * 0.075).max(2.0) as i32,
-        metal,
-    );
-    d.draw_rectangle((centro.x + tamano * 0.53) as i32, (centro.y + tamano * 0.12) as i32, (tamano * 0.14) as i32, (tamano * 0.035).max(2.0) as i32, borde);
-    d.draw_circle_v(Vector2::new(centro.x + tamano * 0.23, centro.y + tamano * 0.17), tamano * 0.07, piel);
+    let cruz = (alto * 0.24).max(2.0);
+    d.draw_rectangle((centro.x - cruz * 0.5) as i32, (centro.y - alto * 0.34) as i32, cruz as i32, (alto * 0.68) as i32, Color::new(194, 47, 42, 255));
+    d.draw_rectangle((centro.x - ancho * 0.19) as i32, (centro.y - cruz * 0.5) as i32, (ancho * 0.38) as i32, cruz as i32, Color::new(194, 47, 42, 255));
 }
 
 fn dibujar_bala(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32, enemiga: bool) {
@@ -157,11 +121,19 @@ fn dibujar_bala(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32, enemiga:
     );
 }
 
-fn dibujar_entidad(d: &mut RaylibDrawHandle, entidad: &Entity, centro: Vector2, tamano: f32) {
+fn dibujar_entidad(d: &mut RaylibDrawHandle, entidad: &Entity, centro: Vector2, tamano: f32, textura_enemigo: &Texture2D) {
     match entidad.tipo {
         EntityType::Weapon => dibujar_pickup_arma(d, centro, tamano),
         EntityType::Ammo => dibujar_municion(d, centro, tamano),
-        EntityType::Enemy => dibujar_soldado(d, centro, tamano),
+        EntityType::Health => dibujar_botiquin(d, centro, tamano),
+        EntityType::Enemy => d.draw_texture_pro(
+            textura_enemigo,
+            Rectangle::new(0.0, 0.0, textura_enemigo.width() as f32, textura_enemigo.height() as f32),
+            Rectangle::new(centro.x, centro.y, tamano * 1.25, tamano * 1.25),
+            Vector2::new(tamano * 0.625, tamano * 0.86),
+            0.0,
+            Color::WHITE,
+        ),
         EntityType::Bullet => dibujar_bala(d, centro, tamano, false),
         EntityType::EnemyBullet => dibujar_bala(d, centro, tamano, true),
     }
@@ -273,6 +245,7 @@ fn dibujar_minimapa(d: &mut RaylibDrawHandle, mapa: &Map, jugador: &Player, enti
             EntityType::Enemy => Color::new(224, 82, 68, 255),
             EntityType::Weapon => Color::new(246, 200, 58, 255),
             EntityType::Ammo => Color::new(239, 171, 57, 255),
+            EntityType::Health => Color::new(240, 76, 67, 255),
             EntityType::Bullet => Color::new(255, 240, 180, 255),
             EntityType::EnemyBullet => Color::new(255, 64, 48, 255),
         };
@@ -300,6 +273,7 @@ fn dibujar_vista_3d(
     impactos: &[(f32, Impacto)],
     textura_muro: &Texture2D,
     textura_arma: &Texture2D,
+    textura_enemigo: &Texture2D,
 ) {
     let ancho = d.get_screen_width() as f32;
     let alto = d.get_screen_height() as f32;
@@ -406,6 +380,7 @@ fn dibujar_vista_3d(
                     entidad,
                     Vector2::new(pantalla_x, mitad_alto + tamano * 0.18),
                     tamano,
+                    textura_enemigo,
                 );
             }
         }
@@ -488,6 +463,7 @@ fn dibujar_vista_2d(
     entidades: &[Entity],
     impactos: &[(f32, Impacto)],
     textura_jugador: &Texture2D,
+    textura_enemigo: &Texture2D,
 ) {
     let cuadricula = Color::new(35, 45, 60, 255);
     let amarillo = Color::new(246, 200, 58, 255);
@@ -510,6 +486,7 @@ fn dibujar_vista_2d(
             entidad,
             entidad.posicion * TAM_CELDA as f32,
             TAM_CELDA as f32 * 0.55,
+            textura_enemigo,
         );
     }
 
@@ -550,6 +527,7 @@ pub fn dibujar_frame(
     entidades: &[Entity],
     impactos: &[(f32, Impacto)],
     textura_jugador: &Texture2D,
+    textura_enemigo: &Texture2D,
     textura_muro: &Texture2D,
     textura_arma: &Texture2D,
 ) {
@@ -563,9 +541,10 @@ pub fn dibujar_frame(
             impactos,
             textura_muro,
             textura_arma,
+            textura_enemigo,
         );
     } else {
-        dibujar_vista_2d(d, mapa, jugador, entidades, impactos, textura_jugador);
+        dibujar_vista_2d(d, mapa, jugador, entidades, impactos, textura_jugador, textura_enemigo);
     }
     let enemigos = entidades
         .iter()

@@ -4,6 +4,7 @@ use raylib::prelude::*;
 pub enum EntityType {
     Weapon,
     Ammo,
+    Health,
     Enemy,
     Bullet,
     EnemyBullet,
@@ -33,6 +34,17 @@ impl Entity {
     pub fn ammo(posicion: Vector2) -> Self {
         Self {
             tipo: EntityType::Ammo,
+            posicion,
+            active: true,
+            direccion: Vector2::zero(),
+            vida: 0.0,
+            cooldown: 0.0,
+        }
+    }
+
+    pub fn health(posicion: Vector2) -> Self {
+        Self {
+            tipo: EntityType::Health,
             posicion,
             active: true,
             direccion: Vector2::zero(),
