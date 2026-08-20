@@ -81,11 +81,11 @@ fn main() {
                     EntityType::Weapon => {
                         entidad.active = false;
                         jugador.has_weapon = true;
-                        jugador.municion += 12;
+                        jugador.municion += 30;
                     }
                     EntityType::Ammo => {
                         entidad.active = false;
-                        jugador.municion += 8;
+                        jugador.municion += 15;
                     }
                     _ => {}
                 }
@@ -131,11 +131,20 @@ fn main() {
                     let angulo = direccion.y.atan2(direccion.x);
                     let pared = lanzar_rayo(&mapa, enemigo.posicion, angulo, distancia);
                     if pared.distancia >= distancia - 0.06 {
+                        // Ningún enemigo dispara con precisión perfecta: la dispersión
+                        // y la velocidad baja dejan un carril claro para esquivar.
+                        let dispersion = (enemigo.posicion.x * 3.71 + enemigo.posicion.y * 1.93)
+                            .sin()
+                            * 0.12;
+                        let direccion_disparo = Vector2::new(
+                            (angulo + dispersion).cos(),
+                            (angulo + dispersion).sin(),
+                        );
                         disparos_enemigos.push(Entity::enemy_bullet(
                             enemigo.posicion + direccion * 0.36,
-                            direccion,
+                            direccion_disparo,
                         ));
-                        enemigo.cooldown = 1.0 + (enemigo.posicion.x * 0.17).rem_euclid(0.55);
+                        enemigo.cooldown = 1.65 + (enemigo.posicion.x * 0.31).rem_euclid(0.85);
                     }
                 }
             }

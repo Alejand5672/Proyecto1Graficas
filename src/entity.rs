@@ -48,7 +48,8 @@ impl Entity {
             active: true,
             direccion: Vector2::zero(),
             vida: 0.0,
-            cooldown: 0.65 + posicion.x.rem_euclid(1.3),
+            // El desfase evita que todos los soldados abran fuego a la vez.
+            cooldown: 1.2 + posicion.x.rem_euclid(1.5),
         }
     }
 
@@ -69,7 +70,7 @@ impl Entity {
             posicion,
             active: true,
             direccion,
-            vida: 2.2,
+            vida: 3.4,
             cooldown: 0.0,
         }
     }
