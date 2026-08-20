@@ -145,6 +145,7 @@ fn dibujar_arma_primera_persona(
     alto: f32,
     textura_arma: &Texture2D,
     retroceso: f32,
+    inclinacion: f32,
 ) {
     let altura_destino = (alto * 0.58).clamp(280.0, 430.0);
     let ancho_destino = altura_destino * textura_arma.width() as f32 / textura_arma.height() as f32;
@@ -160,7 +161,8 @@ fn dibujar_arma_primera_persona(
         ),
         Rectangle::new(
             ancho * 0.5,
-            alto + 8.0 + desplazamiento,
+            // Arma y retícula comparten el desplazamiento de la cámara.
+            alto + 8.0 + desplazamiento - inclinacion,
             ancho_destino,
             altura_destino,
         ),
@@ -172,7 +174,7 @@ fn dibujar_arma_primera_persona(
     if retroceso > 0.075 {
         let boca = Vector2::new(
             ancho * 0.5,
-            alto + 8.0 + desplazamiento - altura_destino * 0.88,
+            alto + 8.0 + desplazamiento - inclinacion - altura_destino * 0.88,
         );
         d.draw_circle_v(boca, 18.0, Color::new(255, 166, 38, 105));
         d.draw_circle_v(boca, 8.0, Color::new(255, 241, 158, 245));
@@ -277,12 +279,13 @@ fn dibujar_vista_3d(
 ) {
     let ancho = d.get_screen_width() as f32;
     let alto = d.get_screen_height() as f32;
-    let mitad_alto = alto / 2.0;
+    // Al mirar abajo el horizonte sube; al mirar arriba baja.
+    let horizonte = (alto / 2.0 - jugador.inclinacion).clamp(alto * 0.18, alto * 0.82);
     let bandas = 18;
     for banda in 0..bandas {
         let t = banda as f32 / bandas as f32;
-        let y = (t * mitad_alto) as i32;
-        let h = (mitad_alto / bandas as f32).ceil() as i32 + 1;
+        let y = (t * horizonte) as i32;
+        let h = (horizonte / bandas as f32).ceil() as i32 + 1;
         d.draw_rectangle(
             0,
             y,
@@ -297,9 +300,9 @@ fn dibujar_vista_3d(
         );
         d.draw_rectangle(
             0,
-            (mitad_alto + y as f32) as i32,
+            (horizonte + t * (alto - horizonte)) as i32,
             ancho as i32,
-            h,
+            ((alto - horizonte) / bandas as f32).ceil() as i32 + 1,
             Color::new(
                 (37.0 - 19.0 * t) as u8,
                 (42.0 - 20.0 * t) as u8,
@@ -317,7 +320,7 @@ fn dibujar_vista_3d(
         // Proyección perspectiva real. Cuando el muro supera la pantalla se recorta
         // también la región de textura, en vez de limitar artificialmente su escala.
         let alto_estaca = distancia_plano / distancia;
-        let techo = mitad_alto - alto_estaca / 2.0;
+        let techo = horizonte - alto_estaca / 2.0;
         let inicio_visible = techo.max(0.0);
         let fin_visible = (techo + alto_estaca).min(alto);
         let alto_visible = (fin_visible - inicio_visible).max(0.0);
@@ -378,7 +381,8 @@ fn dibujar_vista_3d(
                 dibujar_entidad(
                     d,
                     entidad,
-                    Vector2::new(pantalla_x, mitad_alto + tamano * 0.18),
+                    // El origen del sprite está en sus botas: queda sobre el suelo.
+                    Vector2::new(pantalla_x, horizonte + tamano * 0.5),
                     tamano,
                     textura_enemigo,
                 );
@@ -387,12 +391,22 @@ fn dibujar_vista_3d(
     }
 
     if jugador.has_weapon {
-        dibujar_arma_primera_persona(d, ancho, alto, textura_arma, jugador.retroceso);
+        dibujar_arma_primera_persona(
+            d,
+            ancho,
+            alto,
+            textura_arma,
+            jugador.retroceso,
+            jugador.inclinacion,
+        );
     }
 
     dibujar_minimapa(d, mapa, jugador, entidades);
 
-    let centro = Vector2::new(ancho * 0.5, mitad_alto);
+    // La pequeña sacudida mantiene la retícula ligada al retroceso del arma.
+    let fase_retroceso = (jugador.retroceso / 0.13).clamp(0.0, 1.0);
+    let sacudida_mira = (fase_retroceso * std::f32::consts::PI).sin() * 4.0;
+    let centro = Vector2::new(ancho * 0.5, horizonte + sacudida_mira);
     let mira = Color::new(235, 244, 238, 210);
     d.draw_line_ex(
         centro - Vector2::new(11.0, 0.0),

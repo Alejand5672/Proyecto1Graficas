@@ -4,6 +4,8 @@ use raylib::prelude::*;
 pub struct Player {
     pub posicion: Vector2,
     pub angulo: f32,
+    /// Desplazamiento vertical de la cámara, en píxeles de pantalla.
+    pub inclinacion: f32,
     pub velocidad: f32,
     pub has_weapon: bool,
     pub municion: i32,
@@ -16,6 +18,7 @@ impl Player {
         Self {
             posicion,
             angulo: 0.0,
+            inclinacion: 0.0,
             velocidad: 2.4,
             has_weapon: false,
             municion: 0,
@@ -34,7 +37,9 @@ impl Player {
         }
 
         if usar_mouse {
-            self.angulo += rl.get_mouse_delta().x * 0.0028;
+            let delta_mouse = rl.get_mouse_delta();
+            self.angulo += delta_mouse.x * 0.0028;
+            self.inclinacion = (self.inclinacion + delta_mouse.y * 0.42).clamp(-150.0, 150.0);
         }
 
         let control_activo = rl.is_gamepad_available(0);
@@ -46,6 +51,11 @@ impl Player {
             let giro_control = rl.get_gamepad_axis_movement(0, GamepadAxis::GAMEPAD_AXIS_RIGHT_X);
             if giro_control.abs() > 0.16 {
                 self.angulo += giro_control * 2.5 * dt;
+            }
+            let inclinacion_control = rl.get_gamepad_axis_movement(0, GamepadAxis::GAMEPAD_AXIS_RIGHT_Y);
+            if inclinacion_control.abs() > 0.16 {
+                self.inclinacion = (self.inclinacion + inclinacion_control * 155.0 * dt)
+                    .clamp(-150.0, 150.0);
             }
         }
 
