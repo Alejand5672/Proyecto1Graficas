@@ -18,6 +18,7 @@ pub struct Entity {
     pub direccion: Vector2,
     pub vida: f32,
     pub cooldown: f32,
+    pub animacion: f32,
 }
 
 impl Entity {
@@ -29,6 +30,7 @@ impl Entity {
             direccion: Vector2::zero(),
             vida: 0.0,
             cooldown: 0.0,
+            animacion: 0.0,
         }
     }
 
@@ -40,6 +42,7 @@ impl Entity {
             direccion: Vector2::zero(),
             vida: 0.0,
             cooldown: 0.0,
+            animacion: 0.0,
         }
     }
 
@@ -51,6 +54,7 @@ impl Entity {
             direccion: Vector2::zero(),
             vida: 0.0,
             cooldown: 0.0,
+            animacion: 0.0,
         }
     }
 
@@ -63,6 +67,7 @@ impl Entity {
             vida: 0.0,
             // El desfase evita que todos los soldados abran fuego a la vez.
             cooldown: 1.2 + posicion.x.rem_euclid(1.5),
+            animacion: posicion.x + posicion.y,
         }
     }
 
@@ -74,6 +79,7 @@ impl Entity {
             direccion: Vector2::zero(),
             vida: 18.0,
             cooldown: 1.8,
+            animacion: posicion.x + posicion.y,
         }
     }
 
@@ -85,6 +91,7 @@ impl Entity {
             direccion,
             vida: 1.2,
             cooldown: 0.0,
+            animacion: 0.0,
         }
     }
 
@@ -96,6 +103,7 @@ impl Entity {
             direccion,
             vida: 3.4,
             cooldown: 0.0,
+            animacion: 0.0,
         }
     }
 }

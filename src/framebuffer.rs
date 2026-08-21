@@ -6,7 +6,7 @@ use crate::raycasting::Impacto;
 use raylib::prelude::*;
 
 #[derive(Clone, Copy, PartialEq)]
-pub enum EstadoPantalla { Bienvenida, Jugando, NivelCompletado, Derrota, Victoria }
+pub enum EstadoPantalla { Bienvenida, Instrucciones, Jugando, NivelCompletado, Derrota, Victoria }
 
 fn color_muro(fila: i32, columna: i32) -> Color {
     if (fila + columna) % 2 == 0 {
@@ -129,14 +129,18 @@ fn dibujar_entidad(d: &mut RaylibDrawHandle, entidad: &Entity, centro: Vector2, 
         EntityType::Weapon => dibujar_pickup_arma(d, centro, tamano),
         EntityType::Ammo => dibujar_municion(d, centro, tamano),
         EntityType::Health => dibujar_botiquin(d, centro, tamano),
-        EntityType::Enemy | EntityType::Boss => d.draw_texture_pro(
+        EntityType::Enemy | EntityType::Boss => {
+            let escala = if entidad.tipo == EntityType::Boss { 1.85 } else { 1.25 };
+            let balanceo = entidad.animacion.sin() * tamano * if entidad.tipo == EntityType::Boss { 0.06 } else { 0.035 };
+            d.draw_texture_pro(
             textura_enemigo,
             Rectangle::new(0.0, 0.0, textura_enemigo.width() as f32, textura_enemigo.height() as f32),
-            Rectangle::new(centro.x, centro.y, tamano * if entidad.tipo == EntityType::Boss { 1.85 } else { 1.25 }, tamano * if entidad.tipo == EntityType::Boss { 1.85 } else { 1.25 }),
-            Vector2::new(tamano * if entidad.tipo == EntityType::Boss { 0.925 } else { 0.625 }, tamano * if entidad.tipo == EntityType::Boss { 1.85 } else { 1.25 }),
+            Rectangle::new(centro.x, centro.y + balanceo, tamano * escala, tamano * escala),
+            Vector2::new(tamano * escala * 0.5, tamano * escala),
             0.0,
             if entidad.tipo == EntityType::Boss { Color::new(255, 126, 112, 255) } else { Color::WHITE },
-        ),
+            );
+        }
         EntityType::Bullet => dibujar_bala(d, centro, tamano, false),
         EntityType::EnemyBullet => dibujar_bala(d, centro, tamano, true),
     }
@@ -214,7 +218,7 @@ fn dibujar_jugador(d: &mut RaylibDrawHandle, jugador: &Player, textura_jugador: 
 }
 
 fn dibujar_minimapa(d: &mut RaylibDrawHandle, mapa: &Map, jugador: &Player, entidades: &[Entity]) {
-    let escala = 4.0_f32;
+    let escala = 7.0_f32;
     let ancho = mapa.columnas as f32 * escala;
     let alto = mapa.filas as f32 * escala;
     let margen = 12.0;
@@ -246,16 +250,25 @@ fn dibujar_minimapa(d: &mut RaylibDrawHandle, mapa: &Map, jugador: &Player, enti
     }
 
     for entidad in entidades.iter().filter(|entidad| entidad.active) {
-        let color = match entidad.tipo {
-            EntityType::Enemy => Color::new(224, 82, 68, 255),
-            EntityType::Boss => Color::new(255, 46, 38, 255),
-            EntityType::Weapon => Color::new(246, 200, 58, 255),
-            EntityType::Ammo => Color::new(239, 171, 57, 255),
-            EntityType::Health => Color::new(240, 76, 67, 255),
-            EntityType::Bullet => Color::new(255, 240, 180, 255),
-            EntityType::EnemyBullet => Color::new(255, 64, 48, 255),
-        };
-        d.draw_circle_v(origen + entidad.posicion * escala, 2.0, color);
+        let posicion = origen + entidad.posicion * escala;
+        match entidad.tipo {
+            EntityType::Health => {
+                d.draw_rectangle((posicion.x - 4.0) as i32, (posicion.y - 4.0) as i32, 8, 8, Color::RAYWHITE);
+                d.draw_rectangle((posicion.x - 1.0) as i32, (posicion.y - 3.0) as i32, 2, 6, Color::RED);
+                d.draw_rectangle((posicion.x - 3.0) as i32, (posicion.y - 1.0) as i32, 6, 2, Color::RED);
+            }
+            EntityType::Enemy => d.draw_triangle(
+                Vector2::new(posicion.x, posicion.y - 4.0),
+                Vector2::new(posicion.x - 4.0, posicion.y + 3.0),
+                Vector2::new(posicion.x + 4.0, posicion.y + 3.0),
+                Color::new(224, 82, 68, 255),
+            ),
+            EntityType::Boss => d.draw_circle_v(posicion, 5.0, Color::new(255, 111, 43, 255)),
+            EntityType::Weapon => d.draw_circle_v(posicion, 3.0, Color::new(246, 200, 58, 255)),
+            EntityType::Ammo => d.draw_circle_v(posicion, 3.0, Color::new(239, 171, 57, 255)),
+            EntityType::Bullet => d.draw_circle_v(posicion, 2.0, Color::new(255, 240, 180, 255)),
+            EntityType::EnemyBullet => d.draw_circle_v(posicion, 2.0, Color::new(255, 64, 48, 255)),
+        }
     }
 
     let posicion = origen + jugador.posicion * escala;
@@ -514,7 +527,7 @@ pub fn dibujar_frame(
     textura_muro: &Texture2D,
     textura_arma: &Texture2D,
     estado: EstadoPantalla,
-    nivel: u8,
+    opcion_menu: i32,
 ) {
     d.clear_background(Color::new(16, 22, 32, 255));
     if vista_3d {
@@ -572,7 +585,7 @@ pub fn dibujar_frame(
         d.draw_rectangle_lines(310, 42, 165, 15, Color::RAYWHITE);
     }
     d.draw_text(
-        "Mouse/stick: mirar   Clic/RT: disparar",
+        "Mouse: mirar   Clic: disparar",
         20,
         73,
         13,
@@ -581,17 +594,39 @@ pub fn dibujar_frame(
     let alto_pantalla = d.get_screen_height();
     d.draw_rectangle(8, alto_pantalla - 32, 90, 24, Color::new(7, 10, 15, 190));
     d.draw_fps(15, alto_pantalla - 29);
-    if let Some((titulo, detalle, color)) = match estado {
-        EstadoPantalla::Bienvenida => Some(("WICHO SLUG", "1/2 o flechas: elegir nivel    ENTER: jugar", Color::new(255, 215, 91, 255))),
+    if estado == EstadoPantalla::Bienvenida {
+        let ancho = d.get_screen_width(); let alto = d.get_screen_height();
+        d.draw_rectangle(0, 0, ancho, alto, Color::new(9, 13, 16, 250));
+        for x in (0..ancho).step_by(44) { d.draw_line(x, 0, x, alto, Color::new(20, 37, 45, 210)); }
+        for y in (0..alto).step_by(44) { d.draw_line(0, y, ancho, y, Color::new(20, 37, 45, 210)); }
+        let titulo = "WICHO SLUG"; let t = d.measure_text(titulo, 58); d.draw_text(titulo, (ancho - t) / 2, alto / 7, 58, Color::new(255, 236, 177, 255));
+        let subtitulo = "OPERACION BUNKER"; let s = d.measure_text(subtitulo, 22); d.draw_text(subtitulo, (ancho - s) / 2, alto / 7 + 68, 22, Color::new(157, 190, 212, 255));
+        let opciones = ["JUGAR - NIVEL 1", "JUGAR - NIVEL 2", "INSTRUCCIONES", "SALIR"];
+        let x = ancho / 2 - 245; let inicio_y = alto / 2 - 80;
+        for (i, texto) in opciones.iter().enumerate() {
+            let y = inicio_y + i as i32 * 68; let activo = i as i32 == opcion_menu;
+            let borde = if activo { Color::new(255, 190, 72, 255) } else { Color::new(83, 113, 132, 255) };
+            d.draw_rectangle(x, y, 490, 52, Color::new(21, 31, 39, 245)); d.draw_rectangle_lines_ex(Rectangle::new(x as f32, y as f32, 490.0, 52.0), if activo { 4.0 } else { 2.0 }, borde);
+            if activo { d.draw_rectangle(x + 13, y + 10, 7, 32, Color::new(255, 82, 43, 255)); d.draw_rectangle(x + 470, y + 10, 7, 32, Color::new(255, 82, 43, 255)); }
+            let tw = d.measure_text(texto, 25); d.draw_text(texto, x + (490 - tw) / 2, y + 13, 25, if activo { Color::RAYWHITE } else { Color::new(193, 207, 216, 255) });
+        }
+        let ayuda = "FLECHAS: MOVER     ENTER: ELEGIR     ESC: SALIR"; let a = d.measure_text(ayuda, 16); d.draw_text(ayuda, (ancho - a) / 2, alto - 42, 16, Color::new(171, 190, 200, 255));
+    } else if estado == EstadoPantalla::Instrucciones {
+        let ancho = d.get_screen_width(); let alto = d.get_screen_height(); d.draw_rectangle(0, 0, ancho, alto, Color::new(7, 12, 16, 240));
+        let titulo = "INSTRUCCIONES"; let t = d.measure_text(titulo, 42); d.draw_text(titulo, (ancho - t) / 2, alto / 4, 42, Color::new(255, 215, 91, 255));
+        let lineas = ["WASD o flechas: mover", "Mouse: girar la camara", "Clic o ESPACIO: disparar", "Recoge municion y botiquines", "Elimina al jefe del Nivel 2 para ganar"];
+        for (i, linea) in lineas.iter().enumerate() { let w = d.measure_text(linea, 22); d.draw_text(linea, (ancho - w) / 2, alto / 2 - 62 + i as i32 * 32, 22, Color::RAYWHITE); }
+        let volver = "ENTER o M: volver al menu"; let w = d.measure_text(volver, 18); d.draw_text(volver, (ancho - w) / 2, alto - 70, 18, Color::new(157, 190, 212, 255));
+    } else if let Some((titulo, detalle, color)) = match estado {
         EstadoPantalla::NivelCompletado => Some(("NIVEL 1 SUPERADO", "ENTER: siguiente nivel    M: menu", Color::new(95, 235, 137, 255))),
         EstadoPantalla::Derrota => Some(("MISION FALLIDA", "Presiona R para reintentar", Color::new(245, 76, 62, 255))),
         EstadoPantalla::Victoria => Some(("JEFE DERROTADO", "VICTORIA - Presiona R para volver al menu", Color::new(95, 235, 137, 255))),
+        EstadoPantalla::Bienvenida | EstadoPantalla::Instrucciones => None,
         EstadoPantalla::Jugando => None,
     } {
         let ancho = d.get_screen_width(); let alto = d.get_screen_height();
         d.draw_rectangle(0, 0, ancho, alto, Color::new(5, 7, 10, 195));
         let t = d.measure_text(titulo, 42); d.draw_text(titulo, (ancho - t) / 2, alto / 2 - 50, 42, color);
         let s = d.measure_text(detalle, 21); d.draw_text(detalle, (ancho - s) / 2, alto / 2 + 15, 21, Color::RAYWHITE);
-        if estado == EstadoPantalla::Bienvenida { let n = format!("NIVEL SELECCIONADO: {nivel}"); let w = d.measure_text(&n, 18); d.draw_text(&n, (ancho - w) / 2, alto / 2 + 55, 18, Color::new(184, 203, 211, 255)); }
     }
 }
