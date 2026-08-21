@@ -5,6 +5,7 @@ pub enum EntityType {
     Weapon,
     Ammo,
     Health,
+    Fire,
     Enemy,
     Boss,
     Bullet,
@@ -55,6 +56,18 @@ impl Entity {
             vida: 0.0,
             cooldown: 0.0,
             animacion: 0.0,
+        }
+    }
+
+    pub fn fire(posicion: Vector2) -> Self {
+        Self {
+            tipo: EntityType::Fire,
+            posicion,
+            active: true,
+            direccion: Vector2::zero(),
+            vida: 0.0,
+            cooldown: 0.0,
+            animacion: posicion.x + posicion.y,
         }
     }
 

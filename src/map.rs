@@ -58,6 +58,13 @@ impl Map {
                         )));
                         *celda = ' ';
                     }
+                    'F' => {
+                        entidades.push(Entity::fire(Vector2::new(
+                            columna as f32 + 0.5,
+                            fila as f32 + 0.5,
+                        )));
+                        *celda = ' ';
+                    }
                     'E' => {
                         entidades.push(Entity::enemy(Vector2::new(
                             columna as f32 + 0.5,
