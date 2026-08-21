@@ -14,3 +14,5 @@ pub const ENFRIAMIENTO_DISPARO: f32 = 0.22;
 pub const VELOCIDAD_BALA_ENEMIGA: f32 = 2.8;
 pub const DISTANCIA_ATAQUE_ENEMIGO: f32 = 8.0;
 pub const DANO_ENEMIGO: i32 = 12;
+pub const CAPACIDAD_CARGADOR: i32 = 12;
+pub const DURACION_RECARGA: f32 = 1.05;

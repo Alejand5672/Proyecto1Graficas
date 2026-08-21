@@ -1,5 +1,5 @@
 mod config; mod entity; mod framebuffer; mod map; mod player; mod raycasting;
-use config::{DANO_ENEMIGO, DISTANCIA_ATAQUE_ENEMIGO, ENFRIAMIENTO_DISPARO, RADIO_ENEMIGO, RADIO_PICKUP, TAM_CELDA, VELOCIDAD_BALA, VELOCIDAD_BALA_ENEMIGA};
+use config::{CAPACIDAD_CARGADOR, DANO_ENEMIGO, DISTANCIA_ATAQUE_ENEMIGO, DURACION_RECARGA, ENFRIAMIENTO_DISPARO, RADIO_ENEMIGO, RADIO_PICKUP, TAM_CELDA, VELOCIDAD_BALA, VELOCIDAD_BALA_ENEMIGA};
 use entity::{Entity, EntityType}; use framebuffer::{dibujar_frame, EstadoPantalla}; use map::Map; use player::Player; use raycasting::{lanzar_rayo, lanzar_rayos}; use raylib::prelude::*;
 
 fn cargar_nivel(nivel: u8) -> (Map, Vector2, Vec<Entity>) { Map::cargar(if nivel == 1 { "laberinto1.txt" } else { "laberinto2.txt" }) }
@@ -52,9 +52,13 @@ fn main() {
     let mut textura_muro_nivel2 = rl.load_texture(&thread, "assets/wall_war_bunker.png").expect("No se pudo cargar assets/wall_war_bunker.png"); textura_muro_nivel2.gen_texture_mipmaps(); textura_muro_nivel2.set_texture_filter(&thread, TextureFilter::TEXTURE_FILTER_TRILINEAR);
     let textura_arma = rl.load_texture(&thread, "assets/first_person_hands.png").expect("No se pudo cargar assets/first_person_hands.png");
     let textura_fuego = rl.load_texture(&thread, "assets/fire.png").expect("No se pudo cargar assets/fire.png");
+    let textura_cielo_nivel1 = rl.load_texture(&thread, "assets/sky_war_level1.png").expect("No se pudo cargar assets/sky_war_level1.png");
+    let textura_cielo_nivel2 = rl.load_texture(&thread, "assets/sky_war_level2.png").expect("No se pudo cargar assets/sky_war_level2.png");
     let audio = RaylibAudio::init_audio_device().expect("No se pudo inicializar el audio");
     let sonido_disparo = { let onda = audio.new_wave_from_memory(".wav", &crear_disparo()).expect("No se pudo crear el sonido de disparo"); audio.new_sound_from_wave(&onda).expect("No se pudo cargar el sonido de disparo") };
     let sonido_dano = { let onda = audio.new_wave_from_memory(".wav", &crear_onda(96.0, 0.22, true)).expect("No se pudo crear el sonido de dano"); audio.new_sound_from_wave(&onda).expect("No se pudo cargar el sonido de dano") };
+    // Golpe metálico corto para confirmar que el cargador se cambió.
+    let sonido_recarga = { let onda = audio.new_wave_from_memory(".wav", &crear_onda(310.0, 0.14, false)).expect("No se pudo crear el sonido de recarga"); audio.new_sound_from_wave(&onda).expect("No se pudo cargar el sonido de recarga") };
     // Copia autorizada de la canción del Nivel 1.
     let musica_nivel1 = audio.new_music("assets/music/Taylor Swift - Style.mp3").ok();
     if let Some(musica) = &musica_nivel1 { musica.set_volume(0.32); }
@@ -126,9 +130,11 @@ fn main() {
             EstadoPantalla::Victoria => if rl.is_key_pressed(KeyboardKey::KEY_R) { estado = EstadoPantalla::Bienvenida; rl.enable_cursor(); },
             EstadoPantalla::Jugando => {
                 if rl.is_key_pressed(KeyboardKey::KEY_P) || rl.is_key_down(KeyboardKey::KEY_P) || rl.is_key_pressed(KeyboardKey::KEY_F1) { opcion_pausa = 0; estado = EstadoPantalla::Pausa; rl.enable_cursor(); continue; }
-                jugador.actualizar(&rl, &mapa, dt, true); tiempo_disparo = (tiempo_disparo - dt).max(0.0); jugador.retroceso = (jugador.retroceso - dt).max(0.0);
-                for e in &mut entidades { if e.active && jugador.posicion.distance_to(e.posicion) < RADIO_PICKUP { match e.tipo { EntityType::Weapon => { e.active=false; jugador.has_weapon=true; jugador.municion+=30; }, EntityType::Ammo => { e.active=false; jugador.municion+=15; }, EntityType::Health => { e.active=false; jugador.vida=(jugador.vida+35).min(100); }, _=>{} } } }
-                if jugador.has_weapon && jugador.municion > 0 && tiempo_disparo <= 0.0 && (rl.is_key_pressed(KeyboardKey::KEY_SPACE) || rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT)) { let dir=Vector2::new(jugador.angulo.cos(),jugador.angulo.sin()); entidades.push(Entity::bullet(jugador.posicion+dir*0.28,dir)); jugador.municion-=1; tiempo_disparo=ENFRIAMIENTO_DISPARO; jugador.retroceso=0.13; sonido_disparo.play(); }
+                jugador.actualizar(&rl, &mapa, dt, true); tiempo_disparo = (tiempo_disparo - dt).max(0.0); jugador.retroceso = (jugador.retroceso - dt).max(0.0); jugador.recarga = (jugador.recarga - dt).max(0.0);
+                if jugador.recarga <= 0.0 && jugador.has_weapon && jugador.cargador == 0 && jugador.reserva_municion > 0 { let cargar = jugador.reserva_municion.min(CAPACIDAD_CARGADOR); jugador.cargador = cargar; jugador.reserva_municion -= cargar; }
+                for e in &mut entidades { if e.active && jugador.posicion.distance_to(e.posicion) < RADIO_PICKUP { match e.tipo { EntityType::Weapon => { e.active=false; jugador.has_weapon=true; jugador.reserva_municion+=30; }, EntityType::Ammo => { e.active=false; jugador.reserva_municion+=15; }, EntityType::Health => { e.active=false; jugador.vida=(jugador.vida+35).min(100); }, _=>{} } } }
+                if jugador.has_weapon && jugador.recarga <= 0.0 && jugador.cargador < CAPACIDAD_CARGADOR && jugador.reserva_municion > 0 && rl.is_key_pressed(KeyboardKey::KEY_R) { jugador.recarga = DURACION_RECARGA; let cargar = (CAPACIDAD_CARGADOR-jugador.cargador).min(jugador.reserva_municion); jugador.cargador += cargar; jugador.reserva_municion -= cargar; sonido_recarga.play(); }
+                if jugador.has_weapon && jugador.recarga <= 0.0 && jugador.cargador > 0 && tiempo_disparo <= 0.0 && (rl.is_key_pressed(KeyboardKey::KEY_SPACE) || rl.is_mouse_button_pressed(MouseButton::MOUSE_BUTTON_LEFT)) { let dir=Vector2::new(jugador.angulo.cos(),jugador.angulo.sin()); entidades.push(Entity::bullet(jugador.posicion+dir*0.28,dir)); jugador.cargador-=1; tiempo_disparo=ENFRIAMIENTO_DISPARO; jugador.retroceso=0.13; sonido_disparo.play(); }
                 let mut disparos=Vec::new();
                 for e in entidades.iter_mut().filter(|e| e.active && (es_combatiente(e.tipo) || e.tipo == EntityType::Fire)) { e.animacion += dt * if e.tipo == EntityType::Boss { 4.6 } else { 6.0 }; if !es_combatiente(e.tipo) { continue; } e.cooldown=(e.cooldown-dt).max(0.0); let hacia=jugador.posicion-e.posicion; let distancia=hacia.length(); if distancia>0.2 && distancia<=DISTANCIA_ATAQUE_ENEMIGO && e.cooldown<=0.0 { let dir=hacia/distancia; let angulo=dir.y.atan2(dir.x); if lanzar_rayo(&mapa,e.posicion,angulo,distancia).distancia>=distancia-0.06 { let dispersion=(e.posicion.x*3.71+e.posicion.y*1.93).sin()*if e.tipo==EntityType::Boss {0.06}else{0.12}; disparos.push(Entity::enemy_bullet(e.posicion+dir*0.36,Vector2::new((angulo+dispersion).cos(),(angulo+dispersion).sin()))); e.cooldown=if e.tipo==EntityType::Boss {0.95}else{1.65+(e.posicion.x*0.31).rem_euclid(0.85)}; } } }
                 entidades.extend(disparos);
@@ -138,6 +144,7 @@ fn main() {
         }
         let impactos=lanzar_rayos(&mapa,jugador.posicion,jugador.angulo); let mut d=rl.begin_drawing(&thread);
         let textura_muro = if nivel == 2 { &textura_muro_nivel2 } else { &textura_muro_nivel1 };
-        dibujar_frame(&mut d,true,&mapa,&jugador,&entidades,&impactos,&textura_jugador,&textura_enemigo,textura_muro,&textura_arma,&textura_fuego,estado,opcion_menu,opcion_nivel,opcion_pausa);
+        let textura_cielo = if nivel == 2 { &textura_cielo_nivel2 } else { &textura_cielo_nivel1 };
+        dibujar_frame(&mut d,true,&mapa,&jugador,&entidades,&impactos,&textura_jugador,&textura_enemigo,textura_muro,&textura_arma,&textura_fuego,textura_cielo,true,estado,opcion_menu,opcion_nivel,opcion_pausa);
     }
 }

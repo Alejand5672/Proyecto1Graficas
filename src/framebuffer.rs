@@ -1,12 +1,11 @@
-use crate::config::{FOV, NUM_RAYOS, TAM_CELDA};
+use crate::config::{CAPACIDAD_CARGADOR, DURACION_RECARGA, FOV, NUM_RAYOS, TAM_CELDA};
 use crate::entity::{Entity, EntityType};
+#[derive(Clone, Copy, PartialEq)]
+pub enum EstadoPantalla { Bienvenida, SeleccionNivel, Instrucciones, Pausa, Jugando, NivelCompletado, Derrota, Victoria }
 use crate::map::Map;
 use crate::player::Player;
 use crate::raycasting::Impacto;
 use raylib::prelude::*;
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum EstadoPantalla { Bienvenida, SeleccionNivel, Instrucciones, Pausa, Jugando, NivelCompletado, Derrota, Victoria }
 
 fn color_muro(fila: i32, columna: i32) -> Color {
     if (fila + columna) % 2 == 0 {
@@ -98,8 +97,20 @@ fn dibujar_botiquin(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32) {
         Color::new(121, 43, 39, 255),
     );
     let cruz = (alto * 0.24).max(2.0);
-    d.draw_rectangle((centro.x - cruz * 0.5) as i32, (centro.y - alto * 0.34) as i32, cruz as i32, (alto * 0.68) as i32, Color::new(194, 47, 42, 255));
-    d.draw_rectangle((centro.x - ancho * 0.19) as i32, (centro.y - cruz * 0.5) as i32, (ancho * 0.38) as i32, cruz as i32, Color::new(194, 47, 42, 255));
+    d.draw_rectangle(
+        (centro.x - cruz * 0.5) as i32,
+        (centro.y - alto * 0.34) as i32,
+        cruz as i32,
+        (alto * 0.68) as i32,
+        Color::new(194, 47, 42, 255),
+    );
+    d.draw_rectangle(
+        (centro.x - ancho * 0.19) as i32,
+        (centro.y - cruz * 0.5) as i32,
+        (ancho * 0.38) as i32,
+        cruz as i32,
+        Color::new(194, 47, 42, 255),
+    );
 }
 
 fn dibujar_bala(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32, enemiga: bool) {
@@ -124,25 +135,68 @@ fn dibujar_bala(d: &mut RaylibDrawHandle, centro: Vector2, tamano: f32, enemiga:
     );
 }
 
-fn dibujar_entidad(d: &mut RaylibDrawHandle, entidad: &Entity, centro: Vector2, tamano: f32, textura_enemigo: &Texture2D, textura_fuego: &Texture2D) {
+fn dibujar_entidad(
+    d: &mut RaylibDrawHandle,
+    entidad: &Entity,
+    centro: Vector2,
+    tamano: f32,
+    textura_enemigo: &Texture2D,
+    textura_fuego: &Texture2D,
+) {
     match entidad.tipo {
         EntityType::Weapon => dibujar_pickup_arma(d, centro, tamano),
         EntityType::Ammo => dibujar_municion(d, centro, tamano),
         EntityType::Health => dibujar_botiquin(d, centro, tamano),
         EntityType::Fire => {
             let pulso = 1.0 + entidad.animacion.sin() * 0.10;
-            d.draw_texture_pro(textura_fuego, Rectangle::new(0.0, 0.0, textura_fuego.width() as f32, textura_fuego.height() as f32), Rectangle::new(centro.x, centro.y, tamano * pulso, tamano * pulso), Vector2::new(tamano * pulso * 0.5, tamano * pulso), 0.0, Color::WHITE);
+            d.draw_texture_pro(
+                textura_fuego,
+                Rectangle::new(
+                    0.0,
+                    0.0,
+                    textura_fuego.width() as f32,
+                    textura_fuego.height() as f32,
+                ),
+                Rectangle::new(centro.x, centro.y, tamano * pulso, tamano * pulso),
+                Vector2::new(tamano * pulso * 0.5, tamano * pulso),
+                0.0,
+                Color::WHITE,
+            );
         }
         EntityType::Enemy | EntityType::Boss => {
-            let escala = if entidad.tipo == EntityType::Boss { 1.85 } else { 1.25 };
-            let balanceo = entidad.animacion.sin() * tamano * if entidad.tipo == EntityType::Boss { 0.06 } else { 0.035 };
+            let escala = if entidad.tipo == EntityType::Boss {
+                1.85
+            } else {
+                1.25
+            };
+            let balanceo = entidad.animacion.sin()
+                * tamano
+                * if entidad.tipo == EntityType::Boss {
+                    0.06
+                } else {
+                    0.035
+                };
             d.draw_texture_pro(
-            textura_enemigo,
-            Rectangle::new(0.0, 0.0, textura_enemigo.width() as f32, textura_enemigo.height() as f32),
-            Rectangle::new(centro.x, centro.y + balanceo, tamano * escala, tamano * escala),
-            Vector2::new(tamano * escala * 0.5, tamano * escala),
-            0.0,
-            if entidad.tipo == EntityType::Boss { Color::new(255, 126, 112, 255) } else { Color::WHITE },
+                textura_enemigo,
+                Rectangle::new(
+                    0.0,
+                    0.0,
+                    textura_enemigo.width() as f32,
+                    textura_enemigo.height() as f32,
+                ),
+                Rectangle::new(
+                    centro.x,
+                    centro.y + balanceo,
+                    tamano * escala,
+                    tamano * escala,
+                ),
+                Vector2::new(tamano * escala * 0.5, tamano * escala),
+                0.0,
+                if entidad.tipo == EntityType::Boss {
+                    Color::new(255, 126, 112, 255)
+                } else {
+                    Color::WHITE
+                },
             );
         }
         EntityType::Bullet => dibujar_bala(d, centro, tamano, false),
@@ -157,11 +211,14 @@ fn dibujar_arma_primera_persona(
     textura_arma: &Texture2D,
     retroceso: f32,
     inclinacion: f32,
+    recarga: f32,
 ) {
     let altura_destino = (alto * 0.58).clamp(280.0, 430.0);
     let ancho_destino = altura_destino * textura_arma.width() as f32 / textura_arma.height() as f32;
     let fase_retroceso = (retroceso / 0.13).clamp(0.0, 1.0);
     let desplazamiento = (fase_retroceso * std::f32::consts::PI).sin() * 16.0;
+    let fase_recarga = (recarga / DURACION_RECARGA).clamp(0.0, 1.0);
+    let bajar_recarga = (fase_recarga * std::f32::consts::PI).sin() * 165.0;
     d.draw_texture_pro(
         textura_arma,
         Rectangle::new(
@@ -173,7 +230,7 @@ fn dibujar_arma_primera_persona(
         Rectangle::new(
             ancho * 0.5,
             // Arma y retícula comparten el desplazamiento de la cámara.
-            alto + 8.0 + desplazamiento - inclinacion,
+            alto + 8.0 + desplazamiento - inclinacion + bajar_recarga,
             ancho_destino,
             altura_destino,
         ),
@@ -185,7 +242,7 @@ fn dibujar_arma_primera_persona(
     if retroceso > 0.075 {
         let boca = Vector2::new(
             ancho * 0.5,
-            alto + 8.0 + desplazamiento - inclinacion - altura_destino * 0.88,
+            alto + 8.0 + desplazamiento - inclinacion + bajar_recarga - altura_destino * 0.88,
         );
         d.draw_circle_v(boca, 18.0, Color::new(255, 166, 38, 105));
         d.draw_circle_v(boca, 8.0, Color::new(255, 241, 158, 245));
@@ -257,9 +314,27 @@ fn dibujar_minimapa(d: &mut RaylibDrawHandle, mapa: &Map, jugador: &Player, enti
         let posicion = origen + entidad.posicion * escala;
         match entidad.tipo {
             EntityType::Health => {
-                d.draw_rectangle((posicion.x - 4.0) as i32, (posicion.y - 4.0) as i32, 8, 8, Color::RAYWHITE);
-                d.draw_rectangle((posicion.x - 1.0) as i32, (posicion.y - 3.0) as i32, 2, 6, Color::RED);
-                d.draw_rectangle((posicion.x - 3.0) as i32, (posicion.y - 1.0) as i32, 6, 2, Color::RED);
+                d.draw_rectangle(
+                    (posicion.x - 4.0) as i32,
+                    (posicion.y - 4.0) as i32,
+                    8,
+                    8,
+                    Color::RAYWHITE,
+                );
+                d.draw_rectangle(
+                    (posicion.x - 1.0) as i32,
+                    (posicion.y - 3.0) as i32,
+                    2,
+                    6,
+                    Color::RED,
+                );
+                d.draw_rectangle(
+                    (posicion.x - 3.0) as i32,
+                    (posicion.y - 1.0) as i32,
+                    6,
+                    2,
+                    Color::RED,
+                );
             }
             EntityType::Enemy => d.draw_triangle(
                 Vector2::new(posicion.x, posicion.y - 4.0),
@@ -299,28 +374,41 @@ fn dibujar_vista_3d(
     textura_arma: &Texture2D,
     textura_enemigo: &Texture2D,
     textura_fuego: &Texture2D,
+    textura_cielo_guerra: Option<&Texture2D>,
 ) {
     let ancho = d.get_screen_width() as f32;
     let alto = d.get_screen_height() as f32;
     // Al mirar abajo el horizonte sube; al mirar arriba baja.
     let horizonte = (alto / 2.0 - jugador.inclinacion).clamp(alto * 0.18, alto * 0.82);
+    if let Some(cielo) = textura_cielo_guerra {
+        d.draw_texture_pro(
+            cielo,
+            Rectangle::new(0.0, 0.0, cielo.width() as f32, cielo.height() as f32),
+            Rectangle::new(0.0, 0.0, ancho, horizonte),
+            Vector2::zero(),
+            0.0,
+            Color::WHITE,
+        );
+    }
     let bandas = 18;
     for banda in 0..bandas {
         let t = banda as f32 / bandas as f32;
         let y = (t * horizonte) as i32;
         let h = (horizonte / bandas as f32).ceil() as i32 + 1;
-        d.draw_rectangle(
-            0,
-            y,
-            ancho as i32,
-            h,
-            Color::new(
-                (13.0 + 15.0 * t) as u8,
-                (21.0 + 20.0 * t) as u8,
-                (34.0 + 25.0 * t) as u8,
-                255,
-            ),
-        );
+        if textura_cielo_guerra.is_none() {
+            d.draw_rectangle(
+                0,
+                y,
+                ancho as i32,
+                h,
+                Color::new(
+                    (13.0 + 15.0 * t) as u8,
+                    (21.0 + 20.0 * t) as u8,
+                    (34.0 + 25.0 * t) as u8,
+                    255,
+                ),
+            );
+        }
         d.draw_rectangle(
             0,
             (horizonte + t * (alto - horizonte)) as i32,
@@ -422,6 +510,7 @@ fn dibujar_vista_3d(
             textura_arma,
             jugador.retroceso,
             jugador.inclinacion,
+            jugador.recarga,
         );
     }
 
@@ -456,7 +545,6 @@ fn dibujar_vista_3d(
         2.0,
         mira,
     );
-
 }
 
 fn dibujar_vista_2d(
@@ -514,8 +602,8 @@ fn dibujar_vista_2d(
 
     d.draw_text(
         &format!(
-            "WASD: mover  Flechas/QE: girar  ESPACIO: disparar  Municion: {}",
-            jugador.municion
+            "WASD: mover  Flechas/QE: girar  ESPACIO: disparar  Cargador: {}/{}",
+            jugador.cargador, jugador.reserva_municion
         ),
         12,
         10,
@@ -536,6 +624,8 @@ pub fn dibujar_frame(
     textura_muro: &Texture2D,
     textura_arma: &Texture2D,
     textura_fuego: &Texture2D,
+    textura_cielo_guerra: &Texture2D,
+    usar_cielo_guerra: bool,
     estado: EstadoPantalla,
     opcion_menu: i32,
     opcion_nivel: i32,
@@ -553,9 +643,19 @@ pub fn dibujar_frame(
             textura_arma,
             textura_enemigo,
             textura_fuego,
+            usar_cielo_guerra.then_some(textura_cielo_guerra),
         );
     } else {
-        dibujar_vista_2d(d, mapa, jugador, entidades, impactos, textura_jugador, textura_enemigo, textura_fuego);
+        dibujar_vista_2d(
+            d,
+            mapa,
+            jugador,
+            entidades,
+            impactos,
+            textura_jugador,
+            textura_enemigo,
+            textura_fuego,
+        );
     }
     let enemigos = entidades
         .iter()
@@ -569,93 +669,318 @@ pub fn dibujar_frame(
     } else {
         Color::new(239, 70, 62, 255)
     };
-    d.draw_rectangle(10, 10, 286, 88, Color::new(5, 9, 15, 220));
-    d.draw_rectangle_lines(10, 10, 286, 88, Color::new(128, 153, 165, 255));
+    d.draw_rectangle(10, 10, 390, 124, Color::new(5, 9, 15, 220));
+    d.draw_rectangle_lines(10, 10, 390, 124, Color::new(128, 153, 165, 255));
     d.draw_text("VIDA", 20, 18, 21, Color::RAYWHITE);
     d.draw_rectangle(82, 20, 150, 18, Color::new(49, 28, 28, 255));
     d.draw_rectangle(82, 20, (150.0 * vida as f32 / 100.0) as i32, 18, color_vida);
     d.draw_rectangle_lines(82, 20, 150, 18, Color::RAYWHITE);
     d.draw_text(&format!("{vida}/100"), 240, 18, 20, color_vida);
     d.draw_text(
-        &format!("MUNICION  {}", jugador.municion),
+        &format!("CARGADOR  {}", jugador.cargador),
         20,
         48,
-        19,
+        21,
         Color::new(255, 215, 91, 255),
     );
     d.draw_text(
-        &format!("ENEMIGOS  {enemigos}"),
-        155,
+        &format!("RESERVA  {}", jugador.reserva_municion),
+        215,
         48,
-        19,
-        Color::new(255, 151, 91, 255),
+        21,
+        Color::new(255, 215, 91, 255),
     );
-    if let Some(jefe) = entidades.iter().find(|e| e.active && e.tipo == EntityType::Boss) {
+    for bala in 0..CAPACIDAD_CARGADOR {
+        let x = 20 + bala * 29;
+        let llena = bala < jugador.cargador;
+        let cuerpo = if llena {
+            Color::new(246, 190, 57, 255)
+        } else {
+            Color::new(56, 47, 32, 255)
+        };
+        d.draw_rectangle(x, 81, 16, 26, cuerpo);
+        d.draw_rectangle(
+            x + 3,
+            76,
+            10,
+            7,
+            if llena {
+                Color::new(255, 231, 124, 255)
+            } else {
+                Color::new(79, 68, 47, 255)
+            },
+        );
+        d.draw_rectangle_lines(x, 76, 16, 31, Color::new(110, 91, 48, 255));
+    }
+    d.draw_rectangle(410, 72, 184, 48, Color::new(5, 9, 15, 220));
+    d.draw_rectangle_lines(410, 72, 184, 48, Color::new(178, 79, 60, 255));
+    d.draw_text("ENEMIGOS", 420, 80, 18, Color::new(255, 151, 91, 255));
+    d.draw_text(
+        &enemigos.to_string(),
+        540,
+        79,
+        26,
+        Color::new(255, 215, 91, 255),
+    );
+    if let Some(jefe) = entidades
+        .iter()
+        .find(|e| e.active && e.tipo == EntityType::Boss)
+    {
         let vida_jefe = jefe.vida.clamp(0.0, 18.0);
-        d.draw_text("JEFE", 310, 18, 20, Color::new(255, 126, 112, 255));
-        d.draw_rectangle(310, 42, 165, 15, Color::new(55, 25, 25, 255));
-        d.draw_rectangle(310, 42, (165.0 * vida_jefe / 18.0) as i32, 15, Color::new(222, 57, 49, 255));
-        d.draw_rectangle_lines(310, 42, 165, 15, Color::RAYWHITE);
+        d.draw_text("JEFE", 420, 18, 20, Color::new(255, 126, 112, 255));
+        d.draw_rectangle(420, 42, 165, 15, Color::new(55, 25, 25, 255));
+        d.draw_rectangle(
+            420,
+            42,
+            (165.0 * vida_jefe / 18.0) as i32,
+            15,
+            Color::new(222, 57, 49, 255),
+        );
+        d.draw_rectangle_lines(420, 42, 165, 15, Color::RAYWHITE);
     }
     d.draw_text(
-        "Mouse: mirar   Clic: disparar   P/F1: pausa",
+        "Mouse: mirar   Clic: disparar   R: recargar   P/F1: pausa",
         20,
-        73,
+        112,
         13,
         Color::new(184, 203, 211, 255),
     );
     let alto_pantalla = d.get_screen_height();
     d.draw_rectangle(8, alto_pantalla - 32, 90, 24, Color::new(7, 10, 15, 190));
     d.draw_fps(15, alto_pantalla - 29);
-    if matches!(estado, EstadoPantalla::Bienvenida | EstadoPantalla::SeleccionNivel) {
-        let ancho = d.get_screen_width(); let alto = d.get_screen_height();
+    if jugador.recarga > 0.0 {
+        let ancho = d.get_screen_width();
+        let progreso = 1.0 - jugador.recarga / DURACION_RECARGA;
+        d.draw_text(
+            "RECARGANDO",
+            ancho / 2 - 70,
+            d.get_screen_height() - 78,
+            18,
+            Color::new(255, 215, 91, 255),
+        );
+        d.draw_rectangle(
+            ancho / 2 - 100,
+            d.get_screen_height() - 52,
+            200,
+            10,
+            Color::new(20, 25, 29, 220),
+        );
+        d.draw_rectangle(
+            ancho / 2 - 100,
+            d.get_screen_height() - 52,
+            (200.0 * progreso) as i32,
+            10,
+            Color::new(255, 178, 55, 255),
+        );
+    }
+    if matches!(
+        estado,
+        EstadoPantalla::Bienvenida | EstadoPantalla::SeleccionNivel
+    ) {
+        let ancho = d.get_screen_width();
+        let alto = d.get_screen_height();
         d.draw_rectangle(0, 0, ancho, alto, Color::new(9, 13, 16, 250));
-        for x in (0..ancho).step_by(44) { d.draw_line(x, 0, x, alto, Color::new(20, 37, 45, 210)); }
-        for y in (0..alto).step_by(44) { d.draw_line(0, y, ancho, y, Color::new(20, 37, 45, 210)); }
-        let (titulo, subtitulo, opciones, seleccion): (&str, &str, &[&str], i32) = if estado == EstadoPantalla::Bienvenida {
-            ("WICHO SLUG", "OPERACION BUNKER", &["JUGAR", "INSTRUCCIONES", "SALIR"], opcion_menu)
-        } else {
-            ("SELECCIONA MISION", "ELIGE TU ZONA DE COMBATE", &["NIVEL 1 - BUNKER", "NIVEL 2 - JEFE FINAL", "REGRESAR"], opcion_nivel)
-        };
-        let t = d.measure_text(titulo, 58); d.draw_text(titulo, (ancho - t) / 2, alto / 7, 58, Color::new(255, 236, 177, 255));
-        let s = d.measure_text(subtitulo, 22); d.draw_text(subtitulo, (ancho - s) / 2, alto / 7 + 68, 22, Color::new(157, 190, 212, 255));
-        let x = ancho / 2 - 245; let inicio_y = alto / 2 - 80;
-        for (i, texto) in opciones.iter().enumerate() {
-            let y = inicio_y + i as i32 * 68; let activo = i as i32 == seleccion;
-            let borde = if activo { Color::new(255, 190, 72, 255) } else { Color::new(83, 113, 132, 255) };
-            d.draw_rectangle(x, y, 490, 52, Color::new(21, 31, 39, 245)); d.draw_rectangle_lines_ex(Rectangle::new(x as f32, y as f32, 490.0, 52.0), if activo { 4.0 } else { 2.0 }, borde);
-            if activo { d.draw_rectangle(x + 13, y + 10, 7, 32, Color::new(255, 82, 43, 255)); d.draw_rectangle(x + 470, y + 10, 7, 32, Color::new(255, 82, 43, 255)); }
-            let tw = d.measure_text(texto, 25); d.draw_text(texto, x + (490 - tw) / 2, y + 13, 25, if activo { Color::RAYWHITE } else { Color::new(193, 207, 216, 255) });
+        for x in (0..ancho).step_by(44) {
+            d.draw_line(x, 0, x, alto, Color::new(20, 37, 45, 210));
         }
-        let ayuda = "FLECHAS: MOVER     ENTER: ELEGIR     ESC: SALIR"; let a = d.measure_text(ayuda, 16); d.draw_text(ayuda, (ancho - a) / 2, alto - 42, 16, Color::new(171, 190, 200, 255));
+        for y in (0..alto).step_by(44) {
+            d.draw_line(0, y, ancho, y, Color::new(20, 37, 45, 210));
+        }
+        let (titulo, subtitulo, opciones, seleccion): (&str, &str, &[&str], i32) =
+            if estado == EstadoPantalla::Bienvenida {
+                (
+                    "WICHO SLUG",
+                    "OPERACION BUNKER",
+                    &["JUGAR", "INSTRUCCIONES", "SALIR"],
+                    opcion_menu,
+                )
+            } else {
+                (
+                    "SELECCIONA MISION",
+                    "ELIGE TU ZONA DE COMBATE",
+                    &["NIVEL 1 - BUNKER", "NIVEL 2 - JEFE FINAL", "REGRESAR"],
+                    opcion_nivel,
+                )
+            };
+        let t = d.measure_text(titulo, 58);
+        d.draw_text(
+            titulo,
+            (ancho - t) / 2,
+            alto / 7,
+            58,
+            Color::new(255, 236, 177, 255),
+        );
+        let s = d.measure_text(subtitulo, 22);
+        d.draw_text(
+            subtitulo,
+            (ancho - s) / 2,
+            alto / 7 + 68,
+            22,
+            Color::new(157, 190, 212, 255),
+        );
+        let x = ancho / 2 - 245;
+        let inicio_y = alto / 2 - 80;
+        for (i, texto) in opciones.iter().enumerate() {
+            let y = inicio_y + i as i32 * 68;
+            let activo = i as i32 == seleccion;
+            let borde = if activo {
+                Color::new(255, 190, 72, 255)
+            } else {
+                Color::new(83, 113, 132, 255)
+            };
+            d.draw_rectangle(x, y, 490, 52, Color::new(21, 31, 39, 245));
+            d.draw_rectangle_lines_ex(
+                Rectangle::new(x as f32, y as f32, 490.0, 52.0),
+                if activo { 4.0 } else { 2.0 },
+                borde,
+            );
+            if activo {
+                d.draw_rectangle(x + 13, y + 10, 7, 32, Color::new(255, 82, 43, 255));
+                d.draw_rectangle(x + 470, y + 10, 7, 32, Color::new(255, 82, 43, 255));
+            }
+            let tw = d.measure_text(texto, 25);
+            d.draw_text(
+                texto,
+                x + (490 - tw) / 2,
+                y + 13,
+                25,
+                if activo {
+                    Color::RAYWHITE
+                } else {
+                    Color::new(193, 207, 216, 255)
+                },
+            );
+        }
+        let ayuda = "FLECHAS: MOVER     ENTER: ELEGIR     ESC: SALIR";
+        let a = d.measure_text(ayuda, 16);
+        d.draw_text(
+            ayuda,
+            (ancho - a) / 2,
+            alto - 42,
+            16,
+            Color::new(171, 190, 200, 255),
+        );
     } else if estado == EstadoPantalla::Instrucciones {
-        let ancho = d.get_screen_width(); let alto = d.get_screen_height(); d.draw_rectangle(0, 0, ancho, alto, Color::new(7, 12, 16, 240));
-        let titulo = "INSTRUCCIONES"; let t = d.measure_text(titulo, 42); d.draw_text(titulo, (ancho - t) / 2, alto / 4, 42, Color::new(255, 215, 91, 255));
-        let lineas = ["WASD o flechas: mover", "Mouse: girar la camara", "Clic o ESPACIO: disparar", "Recoge municion y botiquines", "Elimina al jefe del Nivel 2 para ganar"];
-        for (i, linea) in lineas.iter().enumerate() { let w = d.measure_text(linea, 22); d.draw_text(linea, (ancho - w) / 2, alto / 2 - 62 + i as i32 * 32, 22, Color::RAYWHITE); }
-        let volver = "ENTER o M: volver al menu"; let w = d.measure_text(volver, 18); d.draw_text(volver, (ancho - w) / 2, alto - 70, 18, Color::new(157, 190, 212, 255));
-    } else if estado == EstadoPantalla::Pausa {
-        let ancho = d.get_screen_width(); let alto = d.get_screen_height();
-        d.draw_rectangle(0, 0, ancho, alto, Color::new(5, 9, 13, 210));
-        let titulo = "PAUSA"; let t = d.measure_text(titulo, 46); d.draw_text(titulo, (ancho - t) / 2, alto / 4, 46, Color::new(255, 215, 91, 255));
-        let opciones = ["REANUDAR", "SALIR DEL JUEGO"]; let x = ancho / 2 - 215; let inicio_y = alto / 2 - 20;
-        for (i, texto) in opciones.iter().enumerate() {
-            let y = inicio_y + i as i32 * 62; let activo = i as i32 == opcion_pausa;
-            let borde = if activo { Color::new(255, 190, 72, 255) } else { Color::new(83, 113, 132, 255) };
-            d.draw_rectangle(x, y, 430, 47, Color::new(21, 31, 39, 245)); d.draw_rectangle_lines_ex(Rectangle::new(x as f32, y as f32, 430.0, 47.0), if activo { 4.0 } else { 2.0 }, borde);
-            let w = d.measure_text(texto, 22); d.draw_text(texto, x + (430 - w) / 2, y + 12, 22, if activo { Color::RAYWHITE } else { Color::new(193, 207, 216, 255) });
+        let ancho = d.get_screen_width();
+        let alto = d.get_screen_height();
+        d.draw_rectangle(0, 0, ancho, alto, Color::new(7, 12, 16, 240));
+        let titulo = "INSTRUCCIONES";
+        let t = d.measure_text(titulo, 42);
+        d.draw_text(
+            titulo,
+            (ancho - t) / 2,
+            alto / 4,
+            42,
+            Color::new(255, 215, 91, 255),
+        );
+        let lineas = [
+            "WASD o flechas: mover",
+            "Mouse: girar la camara",
+            "Clic o ESPACIO: disparar",
+            "R: recargar el cargador",
+            "Recoge municion y botiquines",
+            "Elimina al jefe del Nivel 2 para ganar",
+        ];
+        for (i, linea) in lineas.iter().enumerate() {
+            let w = d.measure_text(linea, 22);
+            d.draw_text(
+                linea,
+                (ancho - w) / 2,
+                alto / 2 - 62 + i as i32 * 32,
+                22,
+                Color::RAYWHITE,
+            );
         }
-        let ayuda = "FLECHAS: MOVER     ENTER: ELEGIR     P: REANUDAR"; let a = d.measure_text(ayuda, 16); d.draw_text(ayuda, (ancho - a) / 2, alto - 42, 16, Color::new(171, 190, 200, 255));
+        let volver = "ENTER o M: volver al menu";
+        let w = d.measure_text(volver, 18);
+        d.draw_text(
+            volver,
+            (ancho - w) / 2,
+            alto - 70,
+            18,
+            Color::new(157, 190, 212, 255),
+        );
+    } else if estado == EstadoPantalla::Pausa {
+        let ancho = d.get_screen_width();
+        let alto = d.get_screen_height();
+        d.draw_rectangle(0, 0, ancho, alto, Color::new(5, 9, 13, 210));
+        let titulo = "PAUSA";
+        let t = d.measure_text(titulo, 46);
+        d.draw_text(
+            titulo,
+            (ancho - t) / 2,
+            alto / 4,
+            46,
+            Color::new(255, 215, 91, 255),
+        );
+        let opciones = ["REANUDAR", "SALIR DEL JUEGO"];
+        let x = ancho / 2 - 215;
+        let inicio_y = alto / 2 - 20;
+        for (i, texto) in opciones.iter().enumerate() {
+            let y = inicio_y + i as i32 * 62;
+            let activo = i as i32 == opcion_pausa;
+            let borde = if activo {
+                Color::new(255, 190, 72, 255)
+            } else {
+                Color::new(83, 113, 132, 255)
+            };
+            d.draw_rectangle(x, y, 430, 47, Color::new(21, 31, 39, 245));
+            d.draw_rectangle_lines_ex(
+                Rectangle::new(x as f32, y as f32, 430.0, 47.0),
+                if activo { 4.0 } else { 2.0 },
+                borde,
+            );
+            let w = d.measure_text(texto, 22);
+            d.draw_text(
+                texto,
+                x + (430 - w) / 2,
+                y + 12,
+                22,
+                if activo {
+                    Color::RAYWHITE
+                } else {
+                    Color::new(193, 207, 216, 255)
+                },
+            );
+        }
+        let ayuda = "FLECHAS: MOVER     ENTER: ELEGIR     P: REANUDAR";
+        let a = d.measure_text(ayuda, 16);
+        d.draw_text(
+            ayuda,
+            (ancho - a) / 2,
+            alto - 42,
+            16,
+            Color::new(171, 190, 200, 255),
+        );
     } else if let Some((titulo, detalle, color)) = match estado {
-        EstadoPantalla::NivelCompletado => Some(("NIVEL 1 SUPERADO", "ENTER: siguiente nivel    M: menu", Color::new(95, 235, 137, 255))),
-        EstadoPantalla::Derrota => Some(("MISION FALLIDA", "Presiona R para reintentar", Color::new(245, 76, 62, 255))),
-        EstadoPantalla::Victoria => Some(("JEFE DERROTADO", "VICTORIA - Presiona R para volver al menu", Color::new(95, 235, 137, 255))),
-        EstadoPantalla::Bienvenida | EstadoPantalla::SeleccionNivel | EstadoPantalla::Instrucciones | EstadoPantalla::Pausa => None,
+        EstadoPantalla::NivelCompletado => Some((
+            "NIVEL 1 SUPERADO",
+            "ENTER: siguiente nivel    M: menu",
+            Color::new(95, 235, 137, 255),
+        )),
+        EstadoPantalla::Derrota => Some((
+            "MISION FALLIDA",
+            "Presiona R para reintentar",
+            Color::new(245, 76, 62, 255),
+        )),
+        EstadoPantalla::Victoria => Some((
+            "JEFE DERROTADO",
+            "VICTORIA - Presiona R para volver al menu",
+            Color::new(95, 235, 137, 255),
+        )),
+        EstadoPantalla::Bienvenida
+        | EstadoPantalla::SeleccionNivel
+        | EstadoPantalla::Instrucciones
+        | EstadoPantalla::Pausa => None,
         EstadoPantalla::Jugando => None,
     } {
-        let ancho = d.get_screen_width(); let alto = d.get_screen_height();
+        let ancho = d.get_screen_width();
+        let alto = d.get_screen_height();
         d.draw_rectangle(0, 0, ancho, alto, Color::new(5, 7, 10, 195));
-        let t = d.measure_text(titulo, 42); d.draw_text(titulo, (ancho - t) / 2, alto / 2 - 50, 42, color);
-        let s = d.measure_text(detalle, 21); d.draw_text(detalle, (ancho - s) / 2, alto / 2 + 15, 21, Color::RAYWHITE);
+        let t = d.measure_text(titulo, 42);
+        d.draw_text(titulo, (ancho - t) / 2, alto / 2 - 50, 42, color);
+        let s = d.measure_text(detalle, 21);
+        d.draw_text(detalle, (ancho - s) / 2, alto / 2 + 15, 21, Color::RAYWHITE);
     }
 }
+

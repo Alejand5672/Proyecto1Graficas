@@ -8,7 +8,9 @@ pub struct Player {
     pub inclinacion: f32,
     pub velocidad: f32,
     pub has_weapon: bool,
-    pub municion: i32,
+    pub cargador: i32,
+    pub reserva_municion: i32,
+    pub recarga: f32,
     pub vida: i32,
     pub retroceso: f32,
 }
@@ -21,7 +23,9 @@ impl Player {
             inclinacion: 0.0,
             velocidad: 2.4,
             has_weapon: false,
-            municion: 0,
+            cargador: 0,
+            reserva_municion: 0,
+            recarga: 0.0,
             vida: 100,
             retroceso: 0.0,
         }
